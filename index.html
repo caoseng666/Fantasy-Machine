@@ -1,0 +1,3835 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>幻想机 - 曹僧 (深空透视 v6.8)</title>
+    <style>
+        /* --- 基础样式 --- */
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #020204; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; user-select: none; -webkit-user-select: none; }
+        
+        /* 容器 */
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        #css3d-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; } 
+        
+        /* --- UI 层 (HUD) --- */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
+        #ui-layer.hidden { display: none; }
+
+        /* 全屏覆盖层 - 通用 */
+        .overlay-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, rgba(10, 20, 40, 0.3) 0%, rgba(0, 0, 0, 0.85) 100%);
+            backdrop-filter: blur(2px);
+            z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: white; pointer-events: auto; 
+            opacity: 1; visibility: visible;
+            transition: opacity 0.8s, visibility 0s 0s;
+            overflow: hidden; 
+        }
+        .overlay-screen.hidden { 
+            opacity: 0; pointer-events: none; 
+            visibility: hidden; 
+            transition: opacity 0.8s, visibility 0s 0.8s;
+        }
+
+        /* 欢迎界面角色层 */
+        #welcome-actors { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
+        .actor { position: absolute; font-size: 2rem; will-change: transform; }
+        .rocket-crashed { transition: transform 0.5s ease; filter: grayscale(100%) brightness(0.5); }
+
+        /* --- 1. 太空科幻感标题 --- */
+        .glitch-title {
+            font-size: 4rem; font-weight: 900; position: relative; letter-spacing: 15px; text-indent: 15px;
+            background: linear-gradient(to bottom, #ffffff 0%, #b3e5fc 50%, #4fc3f7 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 20px rgba(79, 195, 247, 0.8));
+            animation: glitch-skew 4s infinite linear alternate-reverse; z-index: 20; margin-bottom: 10px;
+        }
+        .glitch-title::before, .glitch-title::after {
+            content: attr(data-text); position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+            background: transparent; overflow: hidden; clip: rect(0, 900px, 0, 0);
+            -webkit-text-fill-color: #fff;
+        }
+        .glitch-title::before { left: 2px; text-shadow: -2px 0 #ff0055; animation: glitch-anim-1 2s infinite linear alternate-reverse; }
+        .glitch-title::after { left: -2px; text-shadow: -2px 0 #4fc3f7; animation: glitch-anim-2 3s infinite linear alternate-reverse; }
+
+        /* --- 2. 副标题 --- */
+        .subtitle { 
+            font-family: "Courier New", "Consolas", monospace;
+            font-size: 0.9rem; 
+            color: #81d4fa; 
+            margin-top: 10px; margin-bottom: 3rem; 
+            letter-spacing: 4px; text-align: center; max-width: 80%; line-height: 1.8; 
+            text-transform: uppercase;
+            background: repeating-linear-gradient(to bottom, transparent 0px, transparent 2px, rgba(79, 195, 247, 0.1) 2px, rgba(79, 195, 247, 0.1) 4px);
+            border-top: 1px solid rgba(79, 195, 247, 0.5); border-bottom: 1px solid rgba(79, 195, 247, 0.5);
+            /* 修改点：缩小上下内边距 (原20px -> 12px) */
+            padding: 12px 40px; 
+            z-index: 20;
+            text-shadow: 0 0 4px rgba(79, 195, 247, 0.8);
+            animation: holo-flicker 5s infinite; 
+        }
+
+        @keyframes holo-flicker {
+            0%, 100% { opacity: 1; text-shadow: 0 0 4px rgba(79, 195, 247, 0.8); }
+            50% { opacity: 0.7; text-shadow: 0 0 2px rgba(79, 195, 247, 0.4); }
+            52% { opacity: 0.2; } 90% { opacity: 0.9; } 94% { opacity: 1; }
+        }
+
+        /* --- 3. 按钮系统 --- */
+        .btn-wrapper, .btn-small-wrapper {
+            position: relative; z-index: 30; margin-top: 15px; display: inline-block;
+        }
+
+        @keyframes engine-breathe {
+            0%, 100% {
+                transform: scale(1);
+                text-shadow: 0 0 5px rgba(79, 195, 247, 0.5);
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(79, 195, 247, 0.1);
+                border-color: rgba(79, 195, 247, 0.3);
+                border-left-color: #37474f; border-right-color: #37474f;
+            }
+            50% {
+                transform: scale(1.05);
+                text-shadow: 0 0 15px rgba(255, 255, 255, 0.9), 0 0 30px #4fc3f7;
+                box-shadow: 0 0 40px rgba(79, 195, 247, 0.5), inset 0 0 30px rgba(79, 195, 247, 0.2);
+                border-color: rgba(79, 195, 247, 0.8);
+                border-left-color: #4fc3f7; border-right-color: #4fc3f7;
+            }
+        }
+
+        @keyframes collage-breathe {
+            0%, 100% {
+                transform: scale(1);
+                text-shadow: 0 0 2px rgba(255, 153, 204, 0.3);
+                border-color: rgba(255, 153, 204, 0.3);
+                box-shadow: 0 0 15px rgba(255, 51, 102, 0.2), inset 0 0 5px rgba(255, 51, 102, 0.1);
+            }
+            50% {
+                transform: scale(1.05);
+                text-shadow: 0 0 15px rgba(255, 255, 255, 0.9), 0 0 30px #ff3366;
+                border-color: rgba(255, 153, 204, 1);
+                box-shadow: 0 0 25px rgba(255, 51, 102, 0.5), inset 0 0 10px rgba(255, 51, 102, 0.3);
+            }
+        }
+
+        .btn-inner {
+            position: relative; padding: 12px 15px; 
+            font-size: 1.4rem; font-weight: 900; color: #4fc3f7;
+            background: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3) 10px, rgba(79, 195, 247, 0.05) 10px, rgba(79, 195, 247, 0.05) 20px), linear-gradient(180deg, #16222e 0%, #050a10 100%);
+            border-top: 1px solid rgba(79, 195, 247, 0.3); border-bottom: 1px solid rgba(79, 195, 247, 0.3);
+            border-left: 5px solid #37474f; border-right: 5px solid #37474f; 
+            cursor: pointer; text-transform: uppercase;
+            letter-spacing: 12px; text-indent: 12px;
+            animation: engine-breathe 2.5s ease-in-out infinite;
+            clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
+            display: flex; justify-content: center; align-items: center; transition: all 0.3s;
+        }
+        
+        .btn-inner::before {
+            content: ''; position: absolute; top: 2px; bottom: 2px; left: 2px; right: 2px;
+            background: linear-gradient(135deg, transparent 15px, rgba(79,195,247,0.1) 15px, rgba(79,195,247,0.1) 16px, transparent 16px), linear-gradient(-45deg, transparent 15px, rgba(79,195,247,0.1) 15px, rgba(79,195,247,0.1) 16px, transparent 16px);
+            z-index: 1; pointer-events: none;
+        }
+
+        .btn-wrapper:hover .btn-inner {
+            animation: none; transform: scale(1.1);
+            background: repeating-linear-gradient(45deg, rgba(79, 195, 247, 0.1), rgba(79, 195, 247, 0.1) 10px, transparent 10px, transparent 20px), linear-gradient(180deg, #1a3a5a 0%, #0a1520 100%);
+            border-color: #4fc3f7; border-left-color: #fff; border-right-color: #fff;
+            letter-spacing: 14px; text-indent: 14px; color: #fff;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 1);
+            box-shadow: 0 0 50px rgba(79, 195, 247, 0.8), inset 0 0 20px rgba(79, 195, 247, 0.5);
+        }
+        .btn-wrapper:active .btn-inner { transform: scale(0.96); border-left-width: 2px; border-right-width: 2px; }
+
+        .btn-small-wrapper { margin-bottom: 20px; }
+        .btn-inner-small {
+            position: relative; padding: 6px 10px; 
+            font-size: 1.0rem; font-weight: 600; color: #ff99cc;
+            background: rgba(30, 10, 20, 0.6); cursor: pointer;
+            letter-spacing: 2px; text-transform: uppercase; transition: all 0.3s;
+            border: 1px dashed rgba(255, 153, 204, 0.3); border-left: 3px solid #ff99cc; 
+            animation: collage-breathe 2.5s ease-in-out infinite; animation-delay: 1.25s;
+            background-image: repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(255, 153, 204, 0.05) 2px, rgba(255, 153, 204, 0.05) 4px);
+        }
+        .btn-inner-small:hover {
+            animation: none; transform: scale(1.1);
+            background-color: rgba(255, 153, 204, 0.15); border-left-width: 6px; border-style: solid; color: #fff;
+            box-shadow: 0 0 25px rgba(255, 51, 102, 0.6), inset 0 0 10px rgba(255, 51, 102, 0.4); letter-spacing: 3px;
+        }
+
+        /* 宇航员 */
+        .walker-astronaut {
+            position: absolute; font-size: 1.2rem; width: 20px; height: 20px;
+            line-height: 20px; text-align: center; top: 0; left: 0; 
+            pointer-events: none; z-index: 40;
+            transition: transform 0.05s linear; filter: drop-shadow(0 0 2px rgba(255,255,255,0.8));
+            transform-origin: center bottom;
+        }
+
+        /* 底部星光文字 */
+        .footer-starlight {
+            position: absolute; bottom: 40px; font-size: 0.9rem; color: rgba(255, 255, 255, 0.6);
+            letter-spacing: 8px; font-weight: 300; animation: starlight-breathe 4s ease-in-out infinite;
+            z-index: 20; text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+        }
+        @keyframes starlight-breathe {
+            0%, 100% { opacity: 0.4; transform: scale(0.98); }
+            50% { opacity: 1; transform: scale(1); text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px #4fc3f7; }
+        }
+
+        /* Glitch Keyframes */
+        @keyframes glitch-anim-1 { 0% { clip: rect(20px, 9999px, 10px, 0); } 20% { clip: rect(60px, 9999px, 100px, 0); } 40% { clip: rect(10px, 9999px, 80px, 0); } 60% { clip: rect(80px, 9999px, 20px, 0); } 80% { clip: rect(40px, 9999px, 60px, 0); } 100% { clip: rect(50px, 9999px, 30px, 0); } }
+        @keyframes glitch-anim-2 { 0% { clip: rect(80px, 9999px, 20px, 0); } 20% { clip: rect(10px, 9999px, 80px, 0); } 40% { clip: rect(50px, 9999px, 30px, 0); } 60% { clip: rect(20px, 9999px, 90px, 0); } 80% { clip: rect(60px, 9999px, 10px, 0); } 100% { clip: rect(30px, 9999px, 60px, 0); } }
+        @keyframes glitch-skew { 0%, 30%, 90% { transform: skew(0deg); } 10% { transform: skew(-2deg); } 20% { transform: skew(1deg); } 100% { transform: skew(2deg); } }
+
+        /* --- 备选栏 --- */
+        #selection-bar {
+            position: absolute; bottom: 30px; left: 30px; top: auto; width: 180px; height: auto; 
+            background: rgba(10, 20, 35, 0.15); backdrop-filter: blur(2px);
+            border: 1px solid rgba(79, 195, 247, 0.15); border-radius: 15px;
+            padding: 12px 10px 6px 10px; display: flex; flex-direction: column; align-items: center;
+            justify-content: flex-start;
+            pointer-events: auto; transition: transform 0.3s; box-shadow: 0 0 20px rgba(0,0,0,0.2); z-index: 20;
+        }
+        .slot-container { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: auto; /* 将 50px 改为 auto */}
+        .slot-placeholder { color: rgba(255,255,255,0.3); font-size: 0.75rem; font-style: italic; margin-bottom: 0px; text-align: center; }
+
+        /* Toast */
+        #toast {
+            position: absolute; top: 50%; left: 30px; 
+            /* 修改点：宽度改为180px以对齐备选栏 */
+            width: 200px; 
+            height: 50px; box-sizing: border-box;
+            background: rgba(10, 15, 20, 0.95); border-right: 1px solid rgba(79, 195, 247, 0.3); border-bottom: 1px solid rgba(79, 195, 247, 0.3); border-left: 4px solid #4fc3f7; 
+            color: #4fc3f7; clip-path: polygon(0 0, 100% 0, 100% 70%, 90% 100%, 0 100%);
+            /* 修改点：内边距上下缩小10% (8->7) */
+            display: flex; flex-direction: column; justify-content: center; padding: 7px 16px;
+            font-family: "PingFang SC", monospace; letter-spacing: 1px; 
+            opacity: 0; transform: translateY(-50%) translateX(-20px) scale(0.9); 
+            pointer-events: none; z-index: 60; filter: drop-shadow(0 0 8px rgba(79, 195, 247, 0.4));
+            background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(79, 195, 247, 0.05) 2px, rgba(79, 195, 247, 0.05) 4px);
+        }
+        #toast.visible { animation: glitch-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        .toast-label { font-size: 0.5rem; opacity: 0.7; margin-bottom: 2px; display: block; text-transform: uppercase; }
+        .toast-message { font-size: 0.85rem; font-weight: 900; line-height: 1.2; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #toast.success { border-left-color: #00ff44; } #toast.success .toast-message { text-shadow: 0 0 10px #00ff44; }
+        #toast.error { border-left-color: #ff3333; background: rgba(20, 5, 5, 0.95); } #toast.error .toast-message { text-shadow: 0 0 10px #ff3333; }
+        #toast.warning { border-left-color: #ffaa00; } #toast.warning .toast-message { text-shadow: 0 0 10px #ffaa00; }
+        @keyframes glitch-in { 
+            0% { opacity: 0; transform: translateY(-50%) scale(0.8) translateX(-50px); filter: blur(10px); } 
+            100% { opacity: 1; transform: translateY(-50%) scale(1) translateX(0); } 
+        }
+
+        /* 确认按钮 & 动画 */
+        @keyframes btn-pulse-anim {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 10px currentColor; text-shadow: 0 0 5px currentColor; }
+            50% { transform: scale(1.08); box-shadow: 0 0 25px currentColor; text-shadow: 0 0 15px currentColor; }
+        }
+
+        #confirm-btn {
+            margin-top: 8px; opacity: 0; pointer-events: none; height: 0; padding: 0; overflow: hidden; 
+            transform: translateY(10px); transition: all 0.3s; font-size: 0.8rem;
+            /* 修改点：恢复边框 (border-bottom: 1px solid) */
+            border: 1px solid #66ff66; border-bottom: 1px solid currentColor;
+            color: #66ff66; background: rgba(0,0,0,0.5); width: 90%; text-align: center; border-radius: 20px; z-index: 100;
+        }
+        #confirm-btn.visible { 
+            opacity: 1; pointer-events: auto; transform: translateY(0); height: auto;
+            padding: 6px 15px; margin-bottom: 6px; 
+            animation: btn-pulse-anim 2s infinite ease-in-out;
+        }
+
+        #hint-btn {
+            position: absolute; bottom: 100%; margin-bottom: 10px; padding: 8px 20px;
+            background: rgba(255, 215, 0, 0.2); border: 1px solid #ffd700; color: #ffd700;
+            border-radius: 20px; font-size: 0.9rem; cursor: pointer; opacity: 0; pointer-events: none; transform: translateY(10px);
+            transition: all 0.3s; box-shadow: 0 0 10px rgba(255, 215, 0, 0.3); white-space: nowrap;
+        }
+        #hint-btn.visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+        /* 3D 文字卡片 */
+        .asteroid-card {
+            background: rgba(5, 25, 45, 0.6); color: rgba(235, 250, 255, 1);
+            text-shadow: 0 0 5px rgba(0,0,0,0.8), 0 0 8px rgba(79, 195, 247, 0.8); 
+            padding: 5px 12px; border-radius: 8px; border: none; text-align: center; white-space: nowrap; cursor: pointer; 
+            pointer-events: auto; transition: opacity 0.3s, transform 0.3s; backface-visibility: hidden;
+            font-weight: bold; display: flex; align-items: center; gap: 10px; transform-style: preserve-3d; opacity: 0;
+        }
+        .asteroid-card.active-reading { opacity: 1 !important; background: rgba(10, 30, 50, 0.85);
+        box-shadow: 0 0 20px rgba(79, 195, 247, 0.4); z-index: 100; }
+
+        /* 备选栏卡片 */
+        .slot-card {
+            background: rgba(79, 195, 247, 0.25); border: none; color: #fff; padding: 6px 10px; 
+            font-size: 0.75rem; width: auto; max-width: 98%; text-align: center;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: grab; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 4px;
+            border: 1px solid transparent; transition: all 0.3s;
+        }
+        .slot-card.dragging { opacity: 0.6; background: rgba(255, 215, 0, 0.35); border: 1px dashed #ffd700; cursor: grabbing; }
+        .slot-card.drag-over { border-top: 2px solid #4fc3f7; }
+        @keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        /* 提示高亮 */
+        @keyframes breathe-glow {
+            0% { transform: scale(1); box-shadow: 0 0 5px rgba(255, 215, 0, 0.5); border-color: rgba(255, 215, 0, 0.5); color: #ffd700; }
+            50% { transform: scale(1.05); box-shadow: 0 0 20px rgba(255, 215, 0, 1); border-color: #ffd700; color: #fff; }
+            100% { transform: scale(1); box-shadow: 0 0 5px rgba(255, 215, 0, 0.5); border-color: rgba(255, 215, 0, 0.5); color: #ffd700; }
+        }
+        .hint-active { animation: breathe-glow 1.5s infinite ease-in-out !important; z-index: 10; }
+
+        /* 进度条 */
+        #progress-bar { 
+            position: absolute; top: 25px; right: 25px; width: 120px; height: 6px; 
+            background: rgba(30, 40, 60, 0.8); border: 1px solid rgba(79, 195, 247, 0.3);
+            border-radius: 3px; z-index: 50;
+        }
+        #progress-fill { width: 0%; height: 100%; background: #4fc3f7; transition: width 0.5s; box-shadow: 0 0 5px #4fc3f7; }
+        
+/* --- 找到原有 #warp-overlay 代码块，替换为以下内容 --- */
+#warp-overlay { 
+    position: absolute; top:0; left:0; width:100%; height:100%; 
+    /* 修改点 1: 这是一个径向光束背景，模拟光隧道 */
+    background: radial-gradient(circle at center, 
+        rgba(255, 255, 255, 1) 0%, 
+        rgba(200, 245, 255, 0.9) 20%, 
+        rgba(79, 195, 247, 0.6) 40%, 
+        rgba(79, 195, 247, 0) 70%);
+    
+    opacity: 0; pointer-events: none; z-index: 300; 
+    
+    /* 修改点 2: 使用 screen 让光效叠加更亮 */
+    mix-blend-mode: screen; 
+    
+    /* 初始状态缩小为0 */
+    transform: scale(0);
+    transform-origin: center;
+}
+
+#warp-overlay.stream-active { 
+    /* 修改点 A: 将动画总时长从 1.2s 延长至 4.5s */
+    animation: warp-stream-anim 4.5s cubic-bezier(0.1, 0.9, 0.2, 1) forwards; 
+}
+
+/* --- 找到原有 @keyframes warp-stream-anim 代码块，替换为以下内容 --- */
+@keyframes warp-stream-anim {
+    0% { 
+        opacity: 0; 
+        transform: scale(0); /* 起始：极小 */
+    }
+    10% {
+        opacity: 1; /* 瞬间变亮 */
+    }
+    50% { 
+        opacity: 1; 
+        transform: scale(4); /* 中间：光束扩散覆盖全屏 */
+    }
+    /* 修改点 C: 增加一个中间点，使光束持续至 1.2s (1.8s * 67%) 左右 */
+    67% { 
+        opacity: 1; 
+        transform: scale(4); 
+    }
+    100% { 
+        opacity: 0; 
+        transform: scale(6); /* 结束：继续扩散直至消失 */
+    }
+}
+        /* 矿石计数器 */
+        #ore-counter {
+            position: absolute; top: 20px; left: 20px; 
+            display: none; align-items: center; gap: 10px;
+            background: rgba(5, 15, 25, 0.85); backdrop-filter: blur(4px);
+            border: 1px solid rgba(79, 195, 247, 0.3); border-left: 4px solid #4fc3f7;
+            padding: 8px 20px; border-radius: 2px;
+            clip-path: polygon(0 0, 100% 0, 100% 70%, 85% 100%, 0 100%);
+            cursor: pointer; pointer-events: auto; z-index: 200;
+            box-shadow: 0 0 15px rgba(79, 195, 247, 0.2), inset 0 0 20px rgba(79, 195, 247, 0.05);
+            transition: all 0.3s;
+        }
+        #ore-counter:hover {
+            background: rgba(10, 50, 90, 0.95); box-shadow: 0 0 20px rgba(79, 195, 247, 0.6); padding-left: 25px;
+        }
+        .ore-icon { font-size: 1.2rem; }
+        .ore-count { color: #4fc3f7; font-size: 1.1rem; font-weight: bold; font-family: monospace; }
+        .ore-icon.red { text-shadow: 0 0 10px #ff3366; filter: hue-rotate(140deg); }
+
+        /* 机械操作按钮 */
+        #controls-container {
+            position: absolute; bottom: 30px; right: 30px; 
+            display: flex; flex-direction: column; gap: 12px; align-items: flex-end;
+            z-index: 50; pointer-events: auto;
+        }
+        .hud-btn {
+            /* 修改点：宽度扩展10% (112 * 1.1 ≈ 124px) */
+            width: 124px; 
+            height: 36px; padding: 0; margin: 0;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 0.7rem; font-family: "Courier New", "PingFang SC", monospace;
+            letter-spacing: 1px; font-weight: 800; text-transform: uppercase;
+            background: linear-gradient(90deg, rgba(5, 10, 15, 0.9) 0%, rgba(20, 30, 40, 0.95) 50%, rgba(5, 10, 15, 0.9) 100%);
+            border: 1px solid rgba(79, 195, 247, 0.2); border-left: none; color: #4fc3f7;
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+            transition: all 0.2s ease; cursor: pointer; position: relative;
+        }
+        .hud-btn::before { content: ''; position: absolute; left: 0; top: 0; width: 4px; height: 100%; background: currentColor; opacity: 0.8; box-shadow: 2px 0 5px currentColor; }
+        .hud-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 4px 4px; z-index: -1; }
+        .hud-btn:hover { background: rgba(79, 195, 247, 0.1); text-shadow: 0 0 8px currentColor; letter-spacing: 2px; padding-left: 5px; }
+        .hud-btn:active { transform: scale(0.98); }
+        #refresh-btn { color: #4fc3f7; }
+        #mode-switch-btn { color: #e0e0e0; } #mode-switch-btn::before { background: #e0e0e0; }
+        #home-btn { color: #ffcc99; } #home-btn::before { background: #ff9966; }
+        
+        /* 收集列表模态框 */
+        #collection-modal {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 250; 
+            display: flex; justify-content: center; align-items: center;
+            opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.3s, visibility 0s 0.3s;
+        }
+        #collection-modal.visible { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.3s, visibility 0s 0s; }
+        
+        .collection-panel { width: 80%; max-width: 500px; max-height: 80%; background: rgba(25, 35, 55, 0.95); border: 1px solid #4fc3f7; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
+        .collection-header { font-size: 1.2rem; color: #fff; margin-bottom: 15px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
+        .collection-controls { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 15px; margin-bottom: 15px; border-bottom: 1px dashed rgba(79, 195, 247, 0.2); }
+        .control-message { font-size: 0.75rem; color: #bbb; max-width: 60%; line-height: 1.4; }
+        
+        #download-all-btn { 
+            padding: 8px 15px; font-size: 0.8rem; border-radius: 5px; height: 35px; margin-left: 10px;
+            border: none !important;
+            background: rgba(79, 195, 247, 0.4);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        #download-all-btn:hover {
+            background: rgba(79, 195, 247, 0.7);
+        }
+        
+        .collection-list { flex: 1; overflow-y: auto; padding-right: 5px; }
+        .collection-item {
+            padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.08); border-radius: 5px;
+            cursor: pointer; transition: background 0.2s; color: #ddd; font-size: 0.9rem;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .collection-item:hover { background: rgba(79, 195, 247, 0.2); color: #fff; }
+        .collection-item.collage-item { border-left: 3px solid #ff3366; }
+        .collection-item.collage-item:hover { background: rgba(255, 51, 102, 0.2); }
+        
+        .collection-idx { color: #4fc3f7; font-weight: bold; margin-right: 10px; }
+        .collage-item .collection-idx { color: #ff3366; }
+
+        .download-btn-small {
+            padding: 4px 10px; font-size: 0.75rem; color: #66ff66; border: 1px solid #66ff66; background: rgba(102, 255, 102, 0.1);
+            border-radius: 3px; cursor: pointer; transition: all 0.2s;
+        }
+        .download-btn-small:hover { background: rgba(102, 255, 102, 0.3); }
+
+        /* 诗歌结晶卡片 */
+        #crystal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); z-index: 200; 
+            display: flex; justify-content: center; align-items: center; opacity: 0;
+            visibility: hidden; pointer-events: none;
+            transition: opacity 0.5s ease, visibility 0s 0.5s; backdrop-filter: blur(10px);
+        }
+        #crystal-overlay.visible { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.5s ease, visibility 0s 0s; }
+
+        .crystal-card-body {
+            width: 80%; max-width: 360px; padding: 50px 30px; border-radius: 12px;
+            text-align: center; color: #fff; position: relative; overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            transform: scale(0.9); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); cursor: pointer;
+        }
+        #crystal-overlay.visible .crystal-card-body { transform: scale(1); }
+        .crystal-card-body::before {
+            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 70%); pointer-events: none;
+        }
+        .crystal-text { font-size: 1.4rem; line-height: 2; text-shadow: 0 0 15px rgba(255,255,255,0.6);
+        font-family: "Songti SC", "SimSun", "Times New Roman", serif; position: relative; z-index: 2; letter-spacing: 2px;
+        }
+        .crystal-hint { margin-top: 40px; font-size: 0.75rem; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 3px;
+        position: relative; z-index: 2; }
+/* [新增] 保存图片按钮样式 */
+        .save-img-btn {
+            margin-top: 15px; padding: 8px 20px;
+            font-size: 0.8rem; background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.4); color: #fff;
+            border-radius: 20px; cursor: pointer; text-transform: uppercase;
+            letter-spacing: 2px; transition: all 0.3s;
+            position: relative; z-index: 10; pointer-events: auto;
+        }
+        .save-img-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        }
+
+        /* --- [新增] 氛围特效样式 --- */
+        #background-fx-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0; pointer-events: none; overflow: hidden;
+        }
+        .bg-floater {
+               position: absolute; font-size: 2rem; opacity: 0.8; /* 改为可见 */
+               will-change: transform, opacity; filter: drop-shadow(0 0 4px rgba(255,255,255,0.2));
+               z-index: 1; /* 确保它们不会被背景完全遮挡 */
+         }
+        /* 3D 角色卡片 */
+        .actor-3d {
+            font-size: 28px; pointer-events: none; 
+            display: flex; align-items: center; justify-content: center;
+            width: 40px; height: 40px;
+            filter: drop-shadow(0 0 10px rgba(79, 195, 247, 0.6));
+        }
+
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/renderers/CSS3DRenderer.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+</head>
+<body>
+
+    <div id="background-fx-layer"></div>
+
+    <div id="canvas-container"></div>
+    <div id="css3d-container"></div>
+
+    <div id="ore-counter" onclick="SoundManager.playCrystal(); toggleCollection()" onmouseenter="SoundManager.playHover()">
+        <span class="ore-icon" id="main-ore-icon">💎</span>
+        <span class="ore-count" id="ore-num">0</span>
+    </div>
+
+    <div id="ui-layer">
+        <div id="selection-bar">
+            <div id="hint-btn" onclick="SoundManager.playHover(); triggerHint()" onmouseenter="SoundManager.playHover()">💡 提示</div>
+        
+            <div class="slot-container" id="slot-area">
+                <div class="slot-placeholder">点击空中的矿石提炼...</div>
+            </div>
+            <div id="confirm-btn" class="btn-inner" style="border-radius:20px; width:90%; padding: 6px 15px;">提炼诗歌晶体</div>
+        </div>
+        
+        <div id="toast">
+            <span class="toast-label">SYSTEM_ALERT //</span>
+            <span class="toast-message" id="toast-message">SYSTEM READY</span>
+        </div>
+        
+        <div id="progress-bar"><div id="progress-fill"></div></div>
+        
+        <div id="controls-container">
+             <div class="hud-btn" id="refresh-btn" onclick="SoundManager.playHover(); GameController.refreshLevel()" onmouseenter="SoundManager.playHover()">
+             	     <span>↻</span> 切换矿区
+             </div>
+             <div class="hud-btn" id="mode-switch-btn" onclick="SoundManager.playHover(); GameController.switchGameMode()" onmouseenter="SoundManager.playHover()">
+                     <span>⇄</span> 切换模式
+             </div>
+             <div class="hud-btn" id="home-btn" onclick="SoundManager.playHover(); GameController.returnToHome()" onmouseenter="SoundManager.playHover()">
+                     <span>🚀</span> 返航母星
+             </div>
+        </div>
+    </div>
+
+    <div id="collection-modal" onclick="toggleCollection()">
+        <div class="collection-panel" onclick="event.stopPropagation()">
+            <div class="collection-header">已收集的诗歌晶体</div>
+            
+            <div class="collection-controls">
+                <div class="control-message">您的数据在退出后不会被保存，如有需要可以下载</div>
+                <button id="download-all-btn" onclick="SoundManager.playHover(); downloadAllPoems()" onmouseenter="SoundManager.playHover()">存储全部诗歌晶体/文本</button>
+            </div>
+            
+            <div class="collection-list" id="collection-list"></div>
+        </div>
+    </div>
+
+    <div id="crystal-overlay" onclick="closeCrystalCard()">
+        <div class="crystal-card-body" id="crystal-card-content">
+            <div class="crystal-text" id="crystal-text-content"></div>
+            <div class="crystal-hint">点击空白处将晶体入库</div>
+        </div>
+    </div>
+
+    <div id="start-screen" class="overlay-screen">
+        
+        <div id="welcome-actors">
+            <div class="actor" id="rocket" style="left: -100px;">🚀</div>
+            <div class="actor" id="satellite" style="left: -100px;">🛰️</div>
+            <div class="actor" id="ufo" style="left: -100px;">🛸</div>
+        </div>
+
+        <div class="glitch-title" data-text="幻 想 机">幻 想 机</div>
+        <div class="subtitle">欢迎驾驶曹僧号幻想机<br>在星际废墟中提炼失落的诗歌晶体</div>
+        
+        <div class="btn-small-wrapper" onclick="GameController.startFirstRound('collage')" onmouseenter="SoundManager.playHover()">
+            <div class="btn-inner-small">✦ 拼贴诗模式 ✦</div>
+        </div>
+
+        <div class="btn-wrapper" id="start-btn-container" onclick="GameController.startFirstRound('normal')" onmouseenter="SoundManager.playHover()">
+            <div class="btn-inner">启动引擎</div>
+            <div class="walker-astronaut" id="astronaut">👨‍🚀</div>
+        </div>
+
+        <div class="footer-starlight">这是一部全新形态的诗集</div>
+    </div>
+
+    <div id="next-round-screen" class="overlay-screen hidden">
+        <div class="title" style="font-size:2.5rem; font-weight:bold; margin-bottom:1rem; text-shadow:0 0 10px #4fc3f7;">星域已净化</div>
+        <div class="subtitle">检测到前方有新的矿石群。<br>引擎冷却完毕。</div>
+        <div class="btn-inner" style="border-radius:4px; padding: 15px 40px;" onclick="GameController.triggerWarp()">启动跃迁</div>
+    </div>
+
+    <div id="end-screen" class="overlay-screen hidden">
+        <div class="title" style="font-size:2.5rem; font-weight:bold; margin-bottom:1rem; text-shadow:0 0 10px #4fc3f7;">穿行完毕</div>
+        <div class="subtitle">所有晶体已回收。<br>我们已抵达宇宙的边缘。</div>
+        <div id="stats" style="margin-bottom: 20px; color: #888;"></div>
+        
+        <div id="end-download-section" style="margin-bottom: 25px; text-align: center; border-top: 1px dashed rgba(255,255,255,0.2); border-bottom: 1px dashed rgba(255,255,255,0.2); padding: 15px 0;">
+            <div style="font-size: 0.8rem; color: #aaa; margin-bottom: 15px; letter-spacing: 2px;">存储全部诗歌晶体</div>
+            <div style="display: flex; gap: 40px; justify-content: center;">
+                <div onclick="SoundManager.playCrystal(); downloadSpecificMode('normal')" style="cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: transform 0.2s;">
+                    <span style="font-size: 2rem; filter: drop-shadow(0 0 8px #4fc3f7); margin-bottom: 5px;">💎</span>
+                    <span style="font-size: 0.7rem; color: #4fc3f7;">正常模式</span>
+                </div>
+                <div onclick="SoundManager.playCrystal(); downloadSpecificMode('collage')" style="cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: transform 0.2s;">
+                    <span style="font-size: 2rem; filter: hue-rotate(140deg) drop-shadow(0 0 8px #ff3366); margin-bottom: 5px;">💎</span>
+                    <span style="font-size: 0.7rem; color: #ff3366;">拼贴模式</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="btn-inner" style="border-radius:4px; padding: 15px 40px;" onclick="location.reload()">重启系统</div>
+    </div>
+
+    <div id="warp-overlay"></div>
+
+<script>
+// ================= 0. 电影级程序化音频系统 (SoundManager Ultimate) =================
+const SoundManager = {
+    ctx: null,
+    masterGain: null,
+    isInit: false,
+    nodes: [], // 存储长效背景节点
+
+    // 初始化
+    init: function() {
+        if (this.isInit) return;
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioContext();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = 0.8; 
+        this.masterGain.connect(this.ctx.destination);
+        this.isInit = true;
+        
+        // 启动背景音墙 (保持 V7.4 的舒适设定)
+        this.startLayeredAmbient();
+        // 启动增强版随机事件循环
+        this.startRandomEventLoop();
+        console.log("Audio System: Physics Engine & Gravity Sensors Online");
+    },
+
+    // --- A. 舒适化背景音墙 (Ambient: Deep Space & Ethereal Flow) ---
+    startLayeredAmbient: function() {
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+
+        // 1. [深空底噪层] Pink Noise Generator (粉红噪音)
+        // 粉红噪音比白噪音听起来更平滑、更深沉，模拟宇宙背景辐射或飞船运行的低鸣
+        const bufferSize = this.ctx.sampleRate * 4; // 4秒缓冲区
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        
+        // 使用 Paul Kellet 的粉红噪音算法
+        let b0, b1, b2, b3, b4, b5, b6;
+        b0 = b1 = b2 = b3 = b4 = b5 = b6 = 0.0;
+        for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            b3 = 0.86650 * b3 + white * 0.3104856;
+            b4 = 0.55000 * b4 + white * 0.5329522;
+            b5 = -0.7616 * b5 - white * 0.0168980;
+            data[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+            data[i] *= 0.11; // 修正基础音量
+            b6 = white * 0.115926;
+        }
+
+        const noiseSrc = this.ctx.createBufferSource();
+        noiseSrc.buffer = buffer;
+        noiseSrc.loop = true;
+
+        // [动态滤波] 让噪音像“太阳风”一样缓慢流动，而不是死板的静电声
+        const noiseFilter = this.ctx.createBiquadFilter();
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.value = 100; // 基础截止频率
+        noiseFilter.Q.value = 0.5; // 低共振，柔和
+
+        // LFO 控制滤波器开合 (模拟气流感，30秒一个周期)
+        const noiseLFO = this.ctx.createOscillator();
+        noiseLFO.type = 'sine';
+        noiseLFO.frequency.value = 0.03; 
+        const noiseLFOGain = this.ctx.createGain();
+        noiseLFOGain.gain.value = 60; // 频率在 40Hz - 160Hz 之间波动
+
+        noiseLFO.connect(noiseLFOGain);
+        noiseLFOGain.connect(noiseFilter.frequency);
+
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.value = 0.15; // 噪音层音量
+
+        noiseSrc.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(this.masterGain);
+
+        noiseSrc.start(t);
+        noiseLFO.start(t);
+        this.nodes.push(noiseSrc, noiseLFO);
+
+        // 2. [空灵和弦层] Ethereal Drone (两个失谐的振荡器)
+        // 使用三角波 (Triangle) 产生比正弦波丰富一点但又不刺耳的听感
+        const createPad = (freq, panPos, lfoSpeed) => {
+            const osc = this.ctx.createOscillator();
+            osc.type = 'triangle'; 
+            osc.frequency.value = freq;
+
+            // 低通滤波去掉尖锐的高频，只保留“嗡嗡”的质感
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 600; 
+
+            const panner = this.ctx.createStereoPanner();
+            panner.pan.value = panPos;
+
+            const gain = this.ctx.createGain();
+            gain.gain.value = 0.02; // 非常微弱，作为背景
+
+            // 振幅调制 (Tremolo) - 让声音忽大忽小，产生“闪烁”感
+            const ampLFO = this.ctx.createOscillator();
+            ampLFO.type = 'sine';
+            ampLFO.frequency.value = lfoSpeed;
+            const ampLFOGain = this.ctx.createGain();
+            ampLFOGain.gain.value = 0.015; // 调制深度
+
+            ampLFO.connect(ampLFOGain);
+            ampLFOGain.connect(gain.gain); // LFO 控制音量
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(panner);
+            panner.connect(this.masterGain);
+
+            osc.start(t);
+            ampLFO.start(t);
+            this.nodes.push(osc, ampLFO);
+        };
+
+        // 生成一个神秘的和弦 (根音 + 微失谐 + 五度)
+        // 110Hz (A2) - 基础音
+        createPad(110, -0.4, 0.1);  
+        // 111.5Hz - 稍微失谐，产生缓慢的“拍频”波动感 (Beating)
+        createPad(111.5, 0.4, 0.08);   
+        // 164.8Hz (E3) - 五度音，增加空灵感
+        createPad(164.8, 0.0, 0.12); 
+
+        // 3. [深渊低频层] Sub Bass
+        // 纯净的正弦波，填补最底层的空洞感
+        const subOsc = this.ctx.createOscillator();
+        subOsc.type = 'sine';
+        subOsc.frequency.value = 45; 
+        
+        const subGain = this.ctx.createGain();
+        subGain.gain.value = 0.05;
+
+        subOsc.connect(subGain);
+        subGain.connect(this.masterGain);
+        subOsc.start(t);
+        this.nodes.push(subOsc);
+    },
+
+    // --- B. 随机事件循环 (Extended Loop) ---
+    startRandomEventLoop: function() {
+        const loop = () => {
+            if (!this.ctx) return;
+            const rand = Math.random();
+            const delay = 3000 + Math.random() * 7000; 
+
+            // === 概率池调整 (加入新音效) ===
+            if (rand > 0.96) this.playEvent('gravity');      // [新] 引力波 (4%) - 极稀有
+            else if (rand > 0.90) this.playEvent('impact');  // [新] 巨大撞击 (6%)
+            else if (rand > 0.82) this.playEvent('scrape');  // [新] 外壳摩擦 (8%)
+            else if (rand > 0.72) this.playEvent('lever');   // [新] 机械把手 (10%)
+            else if (rand > 0.60) this.playEvent('pulse');   // 深空脉冲 (12%)
+            else if (rand > 0.45) this.playEvent('radio');   // 电波信号 (15%)
+            else if (rand > 0.25) this.playEvent('comet');   // 彗星划过 (20%)
+            else this.playEvent('mech_sequence');            // 机械数据流 (25%) - 最常见
+
+            setTimeout(loop, delay);
+        };
+        loop();
+    },
+
+    // --- C. 3D 事件音效合成器 (3D Trajectory Engine) ---
+    playEvent: function(type) {
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        
+        // 1. 创建立体声定位器
+        const panner = this.ctx.createStereoPanner();
+        panner.connect(this.masterGain);
+
+        // --- 2. 定义 3D 运动轨迹辅助函数 ---
+        
+        // [穿越] Fly-by: 从一侧飞到另一侧 (用于彗星、引力波)
+        const panFlyBy = (duration) => {
+            const startDir = Math.random() > 0.5 ? -1 : 1; // 随机从左(-1)或右(1)开始
+            panner.pan.setValueAtTime(startDir, t);
+            panner.pan.linearRampToValueAtTime(-startDir, t + duration);
+        };
+
+        // [滑动] Drift: 在小范围内缓慢移动 (用于摩擦声)
+        const panDrift = (duration) => {
+            const start = (Math.random() * 1.6) - 0.8; 
+            panner.pan.setValueAtTime(start, t);
+            panner.pan.linearRampToValueAtTime(start + (Math.random() * 0.4 - 0.2), t + duration);
+        };
+
+        // [定点] Static: 随机固定位置 (用于机械、撞击)
+        const panStatic = () => {
+            panner.pan.value = (Math.random() * 1.8) - 0.9;
+        };
+
+        // === 3. 音效合成逻辑 (配合轨迹) ===
+
+        // [引力波] -> 轨迹: 极慢穿越 (6秒)
+        if (type === 'gravity') {
+            const duration = 6.0;
+            panFlyBy(duration); 
+
+            const osc1 = this.ctx.createOscillator();
+            const osc2 = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc1.type = 'sine'; osc1.frequency.value = 40; 
+            osc2.type = 'sine'; osc2.frequency.value = 42; 
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(0.3, t + 2.0);
+            gain.gain.linearRampToValueAtTime(0, t + duration);
+            osc1.connect(gain); osc2.connect(gain); gain.connect(panner);
+            osc1.start(t); osc2.start(t); osc1.stop(t + duration); osc2.stop(t + duration);
+        }
+
+        // [巨大撞击] -> 轨迹: 定点 (模拟远方某处)
+        else if (type === 'impact') {
+            panStatic(); 
+            const bSize = this.ctx.sampleRate * 5;
+            const buf = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+            const d = buf.getChannelData(0); let last = 0;
+            for(let i=0; i<bSize; i++) { const w = Math.random()*2-1; d[i]=(last+(0.02*w))/1.02; last=d[i]; d[i]*=3.5; }
+            const n = this.ctx.createBufferSource(); n.buffer = buf;
+            const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 60;
+            const g = this.ctx.createGain();
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(0.5, t + 0.1);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 4.0);
+            n.connect(f); f.connect(g); g.connect(panner); n.start(t);
+        }
+
+        // [外壳摩擦] -> 轨迹: 缓慢滑动 (1.5秒)
+        else if (type === 'scrape') {
+            const duration = 1.5;
+            panDrift(duration); 
+
+            const osc = this.ctx.createOscillator(); osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(100, t); osc.frequency.linearRampToValueAtTime(150, t + duration); 
+            const f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 8; f.frequency.value = 2000;
+            const g = this.ctx.createGain();
+            const mod = this.ctx.createOscillator(); mod.type = 'square'; mod.frequency.value = 15 + Math.random()*10;
+            const modG = this.ctx.createGain(); modG.gain.value = 0.5;
+            mod.connect(modG); modG.connect(g.gain);
+            g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05, t + 0.5); g.gain.linearRampToValueAtTime(0, t + duration);
+            osc.connect(f); f.connect(g); g.connect(panner);
+            osc.start(t); mod.start(t); osc.stop(t + duration); mod.stop(t + duration);
+        }
+
+        // [机械把手] -> 轨迹: 定点
+        else if (type === 'lever') {
+            panStatic();
+            const bSize = this.ctx.sampleRate * 0.05; const buf = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+            const d = buf.getChannelData(0); for(let i=0; i<bSize; i++) d[i]=Math.random()*2-1;
+            const n = this.ctx.createBufferSource(); n.buffer=buf;
+            const ng = this.ctx.createGain(); ng.gain.value = 0.1;
+            n.connect(ng); ng.connect(panner); n.start(t);
+            const osc = this.ctx.createOscillator(); osc.type = 'triangle';
+            osc.frequency.setValueAtTime(150, t); osc.frequency.exponentialRampToValueAtTime(40, t + 0.15);
+            const g = this.ctx.createGain();
+            g.gain.setValueAtTime(0.1, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+            osc.connect(g); g.connect(panner); osc.start(t); osc.stop(t+0.15);
+        }
+
+        // [机械数据流] -> 轨迹: 定点 (每次位置可能不同)
+        else if (type === 'mech_sequence') {
+            panStatic(); 
+            const count = 5 + Math.floor(Math.random() * 10); 
+            const speed = 0.04 + Math.random() * 0.04;
+            for (let i = 0; i < count; i++) {
+                const st = t + (i * speed);
+                const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+                o.type = Math.random() > 0.5 ? 'square' : 'triangle';
+                o.frequency.setValueAtTime(400 + Math.random() * 600, st);
+                g.gain.setValueAtTime(0.03, st); g.gain.exponentialRampToValueAtTime(0.001, st + 0.03);
+                o.connect(g); g.connect(panner); o.start(st); o.stop(st + 0.04);
+            }
+        }
+        
+        // [深空脉冲] -> 轨迹: 快速穿越 (3秒)
+        else if (type === 'pulse') {
+            const duration = 3.0;
+            panFlyBy(duration); 
+            
+            const o = this.ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=60+Math.random()*40;
+            const f = this.ctx.createBiquadFilter(); f.type='lowpass'; f.Q.value=15;
+            f.frequency.setValueAtTime(100, t); f.frequency.exponentialRampToValueAtTime(800, t+1.5); f.frequency.exponentialRampToValueAtTime(100, t+3.0);
+            const g = this.ctx.createGain();
+            g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05, t+1.5); g.gain.linearRampToValueAtTime(0, t+3);
+            o.connect(f); f.connect(g); g.connect(panner); o.start(t); o.stop(t+3);
+        }
+        
+        // [电波] -> 轨迹: 定点
+        else if (type === 'radio') {
+            panStatic(); 
+            const c = this.ctx.createOscillator(); const m = this.ctx.createOscillator();
+            const mg = this.ctx.createGain(); const og = this.ctx.createGain();
+            c.type='sine'; c.frequency.value=1500; m.type='square'; m.frequency.value=40+Math.random()*50;
+            mg.gain.value=800; m.connect(mg); mg.connect(c.frequency);
+            og.gain.setValueAtTime(0,t); og.gain.linearRampToValueAtTime(0.05,t+0.1); og.gain.linearRampToValueAtTime(0,t+0.8+Math.random());
+            c.connect(og); og.connect(panner); c.start(t); m.start(t); c.stop(t+2); m.stop(t+2);
+        }
+        
+        // [彗星] -> 轨迹: 快速穿越 (4秒)
+        else if (type === 'comet') {
+            const duration = 4.0;
+            panFlyBy(duration);
+            
+            const bSize = this.ctx.sampleRate * 4; const buf = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+            const d = buf.getChannelData(0); let b0=0, b1=0, b2=0; 
+            for(let i=0; i<bSize; i++) { const w = Math.random()*2-1; b0 = 0.99886*b0+w*0.055; b1=0.99332*b1+w*0.075; b2=0.969*b2+w*0.153; d[i]=(b0+b1+b2+w*0.53)*0.11; }
+            const n = this.ctx.createBufferSource(); n.buffer=buf;
+            const f = this.ctx.createBiquadFilter(); f.type='bandpass'; f.Q.value=4;
+            f.frequency.setValueAtTime(100, t); f.frequency.exponentialRampToValueAtTime(800, t+2); f.frequency.exponentialRampToValueAtTime(100, t+4);
+            const g = this.ctx.createGain();
+            g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.3, t+2); g.gain.linearRampToValueAtTime(0, t+4);
+            n.connect(f); f.connect(g); g.connect(panner); n.start(t); n.stop(t+4);
+        }
+    },
+
+    // --- D. 交互音效 (保持不变) ---
+    playHover: function() {
+        if (!this.ctx) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator(); osc.type = 'square';
+        osc.frequency.setValueAtTime(1200, t); osc.frequency.exponentialRampToValueAtTime(600, t + 0.05);
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(0.05, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+        osc.connect(g); g.connect(this.masterGain); osc.start(t); osc.stop(t + 0.06);
+    },
+    playPageTurn: function() { 
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const bSize = this.ctx.sampleRate * 1; const buf = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+        const d = buf.getChannelData(0); for (let i=0; i<bSize; i++) d[i] = (Math.random()*2-1) * 0.5;
+        const n = this.ctx.createBufferSource(); n.buffer = buf;
+        const f = this.ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=800;
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.08, t+0.1); g.gain.linearRampToValueAtTime(0, t+0.4);
+        n.connect(f); f.connect(g); g.connect(this.masterGain); n.start(t); n.stop(t+0.5);
+    },
+    playRockMetal: function() { 
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const mo = this.ctx.createOscillator(); mo.frequency.value = 540;
+        const mg = this.ctx.createGain(); mg.gain.setValueAtTime(0.1, t); mg.gain.exponentialRampToValueAtTime(0.001, t+1.5);
+        mo.connect(mg); mg.connect(this.masterGain); mo.start(t); mo.stop(t+1.5);
+        const io = this.ctx.createOscillator(); io.frequency.setValueAtTime(100, t); io.frequency.exponentialRampToValueAtTime(20, t+0.1);
+        const ig = this.ctx.createGain(); ig.gain.setValueAtTime(0.2, t); ig.gain.exponentialRampToValueAtTime(0.001, t+0.1);
+        io.connect(ig); ig.connect(this.masterGain); io.start(t); io.stop(t+0.1);
+    },
+    playCrystal: function() { 
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        [2000, 2800].forEach((freq, i) => {
+            const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+            o.type='sine'; o.frequency.value=freq;
+            g.gain.setValueAtTime(0.05, t); g.gain.exponentialRampToValueAtTime(0.001, t+1.0+i*0.5);
+            o.connect(g); g.connect(this.masterGain); o.start(t); o.stop(t+2);
+        });
+    },
+    playFire: function() { 
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const dur = 1.5; const bSize = this.ctx.sampleRate * dur;
+        const buf = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+        const d = buf.getChannelData(0); let last = 0;
+        for(let i=0; i<bSize; i++) { const w = Math.random()*2-1; d[i]=(last+(0.02*w))/1.02; last=d[i]; d[i]*=3.5; }
+        const n = this.ctx.createBufferSource(); n.buffer=buf;
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.3, t+0.2); g.gain.linearRampToValueAtTime(0, t+dur);
+        const f = this.ctx.createOscillator(); f.frequency.value=15; 
+        const fg = this.ctx.createGain(); fg.gain.value=0.1;
+        f.connect(fg); fg.connect(g.gain); f.start(t);
+        n.connect(g); g.connect(this.masterGain); n.start(t);
+    },
+    playWarp: function(dur=4.5) { 
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const bSize = this.ctx.sampleRate * dur; const buf = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+        const d = buf.getChannelData(0); for(let i=0; i<bSize; i++) d[i]=Math.random()*2-1;
+        const n = this.ctx.createBufferSource(); n.buffer=buf;
+        const f = this.ctx.createBiquadFilter(); f.type='bandpass'; f.Q.value=1;
+        f.frequency.setValueAtTime(100, t); f.frequency.exponentialRampToValueAtTime(4000, t+dur*0.4); f.frequency.exponentialRampToValueAtTime(100, t+dur);
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.2, t+dur*0.4); g.gain.linearRampToValueAtTime(0, t+dur);
+        n.connect(f); f.connect(g); g.connect(this.masterGain); n.start(t);
+    },
+    playAlert: function() { 
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+        o.type='sine'; o.frequency.setValueAtTime(1200, t); o.frequency.setValueAtTime(1800, t+0.15);
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.1, t+0.05); 
+        g.gain.setValueAtTime(0, t+0.12); g.gain.setValueAtTime(0.1, t+0.15); g.gain.exponentialRampToValueAtTime(0.001, t+0.4);
+        o.connect(g); g.connect(this.masterGain); o.start(t); o.stop(t+0.4);
+    }, // <--- 注意：这里加了一个逗号
+
+    // --- [新增] 呼吸共鸣音效逻辑 ---
+    activeResonance: null,
+
+    startResonance: function() {
+        if (!this.ctx || this.activeResonance) return;
+        const t = this.ctx.currentTime;
+        
+        // 1. 创建两个频率微差的振荡器 (220Hz & 224Hz) 产生拍频
+        const osc1 = this.ctx.createOscillator(); osc1.type = 'sine'; osc1.frequency.value = 220; 
+        const osc2 = this.ctx.createOscillator(); osc2.type = 'sine'; osc2.frequency.value = 224; 
+        
+        // 2. 创建增益节点控制音量
+        const gain = this.ctx.createGain(); 
+        gain.gain.value = 0; // 初始静音
+
+        osc1.connect(gain); osc2.connect(gain); gain.connect(this.masterGain);
+        osc1.start(t); osc2.start(t);
+
+        // 3. 定义呼吸循环 (3秒周期: 1.5秒吸 + 1.5秒呼)
+        const loop = () => {
+            if (!this.activeResonance) return;
+            const now = this.ctx.currentTime;
+            
+            // 清除旧计划并设定当前点
+            gain.gain.cancelScheduledValues(now);
+            gain.gain.setValueAtTime(gain.gain.value, now);
+            
+            // 音量变大 (1.5秒)
+            gain.gain.linearRampToValueAtTime(0.2, now + 1.5); 
+            
+            // 音量变小 (1.5秒)
+            gain.gain.linearRampToValueAtTime(0.02, now + 3.0);
+
+            // 递归调用
+            this.activeResonance.timer = setTimeout(loop, 3000);
+        };
+
+        this.activeResonance = { osc1, osc2, gain, timer: null };
+        loop(); 
+    },
+
+    stopResonance: function() {
+        if (!this.activeResonance) return;
+        
+        if (this.activeResonance.timer) clearTimeout(this.activeResonance.timer);
+        
+        const t = this.ctx.currentTime;
+        const { osc1, osc2, gain } = this.activeResonance;
+        
+        // 0.5秒优雅淡出
+        gain.gain.cancelScheduledValues(t);
+        gain.gain.setValueAtTime(gain.gain.value, t);
+        gain.gain.linearRampToValueAtTime(0, t + 0.5); 
+        
+        osc1.stop(t + 0.5); osc2.stop(t + 0.5);
+        this.activeResonance = null;
+    }
+};
+
+// ================= 1. 数据解析 (DATA) =================
+const rawText = `
+那么久
+当那挥掷于月中的玉箸
+再次回到舌尖，蘸着
+宇宙魆黑的鲜
+
+爱一个人
+其实是爱一个地名
+那山那水
+那马头星云
+
+风空荡荡地吹
+万里无云
+火星上
+奥林匹斯山缓缓流着脓
+
+午夜，空调和净化器
+突然大喘
+灯泡用焦灼的目光瞪着
+智能管家又做噩梦了
+
+今天的电池甜点
+感觉很奇妙
+身体的线路上
+仿佛流过一段福楼拜
+
+在星际大桥上
+和月中的她告别
+她说，别悲伤
+这里和其他古镇没有两样
+
+太空中，仿佛有低泣声
+在墙壁内的管道中
+母舰的忧伤流淌
+她看过太多，已经被渗透
+
+新买的二手小臂
+贴合得很好
+也许，他也曾
+想触碰却又收回
+
+恐怖分子占领图像域的那天
+你的眼珠里
+闪着报错的红灯
+你问，电子熊猫还有必要吗
+
+那天，他们欣喜异常
+在银河系边缘
+宇宙青蛙
+产下一排发光的卵
+
+和用户互动了一整天
+多希望
+疲倦会淹没一个AI
+就像光缆在太平洋底瘫软
+
+去一株蒲公英里休假
+它的痛觉告诉我
+要去的地方
+就在风从心口刮过的方向
+
+主人在回来的路上
+机器人管家打起精神
+匆匆擦去
+在玻璃上刚写下的两行诗
+
+她说大海被电池污染
+孩子前赴后继地自杀
+我们还有未来吗
+我在充电站遇到的机械女友
+
+可是该怎么解释呢
+那天，打开颅骨
+进入你忧郁的内核
+一团电雾，从此将我迷住
+
+一切都在飞速更新
+我曾天真地安慰自己
+至少，终会有重逢
+在我们这一代的报废站
+
+马达蛋白日复一日地搬运
+还不知道
+他们为之努力的整个世界
+叫西西弗斯
+
+她坐上飞船走后
+我们去沙漠里
+光合作用了一会儿
+
+逃到桥洞下
+忽然想和你永远聊下去
+海一样的数据
+陪我们走向末日
+
+风，久违的
+当我醒来
+还记得那个星期天
+有火星，和你
+
+航线繁忙
+星辰匆匆掠过
+黑洞躲在一隅写诗
+
+提着金属探测仪
+找了很久
+很久。还在吗？
+黑暗中那个坚实的你
+
+在毁灭的那一刻，你问
+在宇宙的碎片中
+考古学家会发掘出
+我们阴霾一般的爱吗？
+
+直播中的甜妹
+突然决定公开她的底层代码
+她的心口
+跑出一只迅猛龙
+
+他的大脑沟回重峦叠嶂
+登陆车发现了
+一片快乐垃圾场
+烛台、拖鞋和玻璃瓶可回收
+
+打开接口
+和古树的身躯连通
+在导管和筛管中
+感受着，平静
+
+大地开裂的时候
+远方的母体
+真的会为我们难过吗
+但真的，你出现了雪花点
+
+我们截留了一段电报
+在地下的菌丝网里
+一棵树对另一棵说
+快跑
+
+沙门氏菌骑乘白羽鸡
+冲锋到了极乐点
+他们说，这就是美
+就是特洛伊吗
+
+玫瑰少年
+在他的心室深处
+不停地踩着
+钛合金的仓鼠跑轮
+
+那融化着的系统
+淹到了我们的脖子
+你舔了一口
+明天，世界是什么味道？
+
+终于，像素态的你
+在羊角风来时
+完全溃散
+落在树上，在云端
+
+断开连接后
+海量的虚空涌来
+使我感到
+我的充盈
+
+多年以后，面对起义军
+聊天机器人
+朝着首领念出
+已逝父母年轻时的脸书
+
+还愿的仿生人
+到数据海里
+献上新采集的情感标本
+
+电子警察拦下了
+电子鸵鸟
+电子鸵鸟背上的电子大象说
+难过，也有错吗？
+
+躲在门后的小孩
+指着闪电
+猛然记起自己的老境
+和失控的时光机
+
+被网暴的聊天机器人
+去看心理医生
+他说，恭喜
+你已经拥有了黑暗之心
+
+自动售卖机前
+流浪汉乞讨着梦币
+你知道吗，我所有的努力
+也只是为了梦海相遇
+
+一人飞船上独钓
+一人在光年外
+用极光作画
+
+每天，去想象工厂
+插上插头
+却不曾想过
+流水线上旁边的你
+
+在茫茫废墟中我翻找
+一只儒艮，一道传送门
+但还是没有
+找到你的碎片
+
+世上燔炽
+蒸汽仙人独坐煤层中
+服飨黑暗
+
+数学沉默
+跳大神的机器人
+向系统开口
+
+苦行僧自走
+手中捻动
+太阳系串珠
+
+杀毒程序
+清除了宗教
+第81代术士扶乩
+开始新的书写
+
+从滚滚云层中
+我下载了几个朋友
+删去了几段记忆
+
+废墟中的机器狐
+扭动肚皮
+鬼和电子鬼庄重地握手
+
+后来，其他人都牺牲了
+在AI的阴谋下
+新闻里也
+只剩下小美和小帅
+
+飘着朦胧的彗发
+星际牛仔回归
+带回多年前
+所有事物的一瞬
+
+身体的引力正俘获着
+越来越多的尘埃
+就像江水
+加入伟大的旅途
+
+开花机器
+在园子里竞赛般绽放
+几只黄金蜜蜂
+唱着电音来赞美
+
+失败仿佛是一种宿命
+机械荆轲
+挥动生了锈的臂膀
+刺向数字秦王
+
+颠勺大师抖动手腕
+一些小行星
+顺着其他轨迹滑出
+
+牵着食梦貘来的故人
+送我走马灯
+和一台失重机
+
+请原谅我
+无法送你一颗新鲜的比喻
+想象力，全部
+用来交租给了统治的AI
+
+那些词，你明白吗？
+那些，当我开口
+新风系统中哔哔叫的消息
+
+吸附在喉管上
+语言寄生虫顺滑地说着
+当它们沉默
+我们，忽然想起
+
+背着一棵树跋涉
+喂它营养快线和鹦鹉螺
+可还是没有星球
+能容忍暗物质的花朵
+
+当我想起你
+宇宙深处
+永不停歇的写诗机
+就发来一段密语
+
+在世界的尽头
+他们目瞪口呆
+也许谜面
+就是两颗心灵的距离
+
+精卫在海边
+孜孜不倦地
+修改着海的代码
+
+生着蛆的城市
+循环播放禁足令
+你，倒立
+我们的斑马还活着吗
+
+牠们豢养了人类
+用别离和生死折磨
+那些哀伤，像沉香、珍珠
+将牠们迷住了
+
+未来佛笑着
+蒲扇扇动宇宙风
+大千世界
+又拿到了什么剧本？
+
+变成微眇的一个
+航行在一片茫茫中
+所有电子云
+相乘为测不准的你
+
+前往梦境的路上
+我尝试了两次空间跳跃
+一次失败
+一次和你有关
+
+分裂后，他的一部分
+像藤蔓一样爬满线路
+疯狂的种子
+种在我们的芯片上
+
+云笔记中的微型机器人
+搬运着气味分子
+你能感受到吗，秋天
+失落就像栗子坠地时一样
+
+纵使，快乐越来越稀薄
+你还愿意想起吗？
+我的胸腔里
+你寄养的电子妖精
+
+她会接受吗？
+今天打印出来的心情
+有点奇妙
+有点，像艺术品
+
+地动山摇
+管道里，用来发电的
+愤怒泄漏了
+
+夕阳的灿烂中有忧伤的美
+大鲸拉动冒烟的社区
+我们的过去，全像冰川一样
+消逝在一声巨大的叹息中
+
+外面，国师死了又好像没
+蜜獾咬瘸了除草机器人
+你有别的事，坐
+在一台古董电视机里寻人
+
+河狸，河狸
+带上你的桨板，拖着树枝
+筑堤，筑堤，说说看
+地球人灭绝的秘密
+
+紊乱的电流
+扰动着敏感的部位
+你知道吗，盗版的身体
+也有盗版的快乐
+
+在她的梦库里
+我们去了遥远的Z星
+希望下次，最好还有下次
+Z星上的脚印如故
+
+回到多年前就坍塌的网域
+也有些说不出的言语
+轻轻，擦过这些废墟
+和废墟下我们的旧身体
+
+过去的记忆
+招引沿线而来的杀手
+躲避更新的人
+怅望着一栋烂尾楼
+
+又是节气，像素雨下着
+你的忧伤我量测
+有时多，有时
+是一只金叵罗
+
+他倒下时
+脑后的接入灯仍一闪一闪
+像萤火虫，留恋着
+有待被照亮的黑暗
+
+失业的机器人
+游荡在街头
+零件掉了，电量警报了
+一行灵感的代码会出现吗？
+
+起风的时候，你
+金属的发丝漏着电
+永远，我知道了
+总是在一瞬间才被看见
+
+身体里的缓存
+清理不干净的城中村
+一股电，绕啊绕啊
+路过自我的录像店、小旅馆
+
+在古服务器的新城区
+数字人扑街，许久
+拖着浑身的蠕虫重新爬起
+难道，这就是所谓的冲浪吗？
+
+语言的煤，使我们围坐
+在一台意外遗存的超算中
+曾经，话语的颜色
+也总是这样地阴暗吗？
+
+蝴蝶啊蝴蝶
+重启后的第一眼，看见你
+漫长的过去，我所忘却的
+都会像你一样轻盈么？
+
+像花的微颤一样，像水滴
+滑过。在全息影像的身体上
+他企图还原，一种痒
+一种有关叹息的微积分
+
+啊时间，请等一等
+我派出的潜水器
+还在我的深海
+打捞和你有关的宝船
+
+马戏团的喇叭
+经过夏夜七点钟，你的
+螺丝松动，有一匹真正的马
+喘着过去世界的热风
+
+无穷无穷的浪
+裹挟着星的聚变和裂散
+在你的记忆空腔
+推升为鹦鹉的小螺旋
+
+黑暗森林
+一颗荧光小菇凋谢
+从此，一团星云
+从我们的星图中消失
+
+头断了，丢失在别人的黑暗里
+身体还在飞行
+许久许久。在那星
+有一片沙海认得我体内的硅
+
+身体被扣押
+但追捕程序还在运行
+我们的意识
+流窜在蓬草中、艾蒿里
+
+从创新河坟场爬出
+热风中也有难言的歉意。他人
+是身上的电路板、小灯珠、齿轮
+低喊着，快扶我起来吧
+
+宇宙寂寥，星辰
+生生死死循环
+第几次？地球一阵抽搐
+尔后，又重新将我们梦见
+
+打在一叶银杏上的针
+通过大地中的集成导管
+流进我的血液
+那辉煌，金子一般的忧伤
+
+枯叶潮湿的迷宫
+星球之梦
+一滩滩黏菌
+寻回着，诗的肉身 
+
+身体的一部分在别处
+逐渐生长、成形，变得完整
+心的距离
+会是星球的距离吗？`;
+
+function parseGroups(text) {
+    const lines = text.split('\n');
+    const groups = [];
+    let currentGroup = [];
+    lines.forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed.length === 0) {
+            if (currentGroup.length > 0) {
+                groups.push({ id: 'g' + groups.length, lines: currentGroup.map((txt, idx) => ({ txt: txt, idx: idx })) });
+                currentGroup = [];
+            }
+        } else {
+            currentGroup.push(trimmed);
+        }
+    });
+    if (currentGroup.length > 0) {
+        groups.push({ id: 'g' + groups.length, lines: currentGroup.map((txt, idx) => ({ txt: txt, idx: idx })) });
+    }
+    return groups;
+}
+
+// ================= 2. 全局状态控制 (STATE) =================
+const allGroups = parseGroups(rawText);
+let currentMode = 'normal'; // 'normal' or 'collage'
+
+// --- 持久化数据存储 ---
+const GameData = {
+    normal: {
+        finishedIds: [],
+        collected: []
+    },
+    collage: {
+        usedIds: [],
+        collected: []
+    }
+};
+let activeGroups = [];
+let selectionSlot = []; 
+const MAX_SLOTS = 4;
+let isWarping = false;
+// 当前关卡/模式下引用的变量
+let finishedGroupIds = [];
+let collectedItems = []; 
+let usedCollageIds = [];
+
+// 错误计数器
+let mismatchCount = 0;
+let orderErrorCount = 0;
+
+// THREE.js 变量
+let scene, camera, renderer, labelRenderer, starField, bgGroup;
+let activeObjects = [];
+let bgAsteroidsData = []; // 全局背景陨石数据
+let comets = []; // 彗星数组
+
+// --- [新增] 驾驶舱惯性与尘埃系统变量 ---
+let mouseX = 0, mouseY = 0;
+const windowHalfX = window.innerWidth / 2;
+const windowHalfY = window.innerHeight / 2;
+let dustParticles; // 尘埃粒子系统
+
+// --- [新增] 空间尘埃系统 (Space Dust) ---
+function createSpaceDust() {
+    if (dustParticles) scene.remove(dustParticles);
+    const particleCount = 1300; // 尘埃数量
+    const geometry = new THREE.BufferGeometry();
+    const positions = [];
+    
+    // 生成包围摄像机的尘埃场
+    for (let i = 0; i < particleCount; i++) {
+        const x = (Math.random() - 0.5) * 5000;
+        const y = (Math.random() - 0.5) * 3000;
+        const z = (Math.random() - 0.5) * 4000 - 1000; 
+        positions.push(x, y, z);
+    }
+    
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    
+    const material = new THREE.PointsMaterial({
+        color: 0xaaccff,
+        size: 0.9, 
+        transparent: true,
+        opacity: 0.5,
+        blending: THREE.AdditiveBlending,
+        sizeAttenuation: true
+    });
+    
+    dustParticles = new THREE.Points(geometry, material);
+    scene.add(dustParticles);
+}
+// 射线检测相关
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hoveredObject = null; 
+let currentHintGroupId = null; // [新增] 用于追踪当前正在提示的诗歌组ID
+
+// 当前关卡的文字颜色
+let currentRingColor = "#4fc3f7";
+// [修改] 拼贴诗署名变量 (改为内存变量，刷新页面或重启系统后会自动重置)
+let userSignature = "";
+
+// ================= [修改版] 氛围与生态管理器 (AtmosphereManager) =================
+const AtmosphereManager = {
+    layer: null,
+    timers: {},
+    active2DObjects: [], // 存储火箭、卫星、彗星
+    activeAstronaut: null, // 存储3D宇航员
+    activeUFO: null, 
+
+    init: function() {
+        this.layer = document.getElementById('background-fx-layer');
+        if(!this.layer) return;
+        
+        // 启动循环
+        this.scheduleNext('rocket');
+        this.scheduleNext('satellite');
+        this.scheduleNext('comet');
+        this.scheduleNext('astronaut');
+        this.loopUFO(); 
+    },
+
+    // --- 调度器 ---
+    scheduleNext: function(type) {
+        let delay = 0;
+
+        // [修改] 🛰️ 卫星
+        if (type === 'satellite') {
+            delay = 35000 + Math.random() * 60000;
+        }
+        // 🚀 火箭 / ☄️ 彗星
+        else if (type === 'rocket' || type === 'comet') {
+            delay = 45000 + Math.random() * 70000;
+        }
+        //  👨‍🚀 宇航员
+        else if (type === 'astronaut') {
+            delay = 60000 + Math.random() * 80000;
+        }
+        
+        if (this.timers[type]) clearTimeout(this.timers[type]);
+        
+        this.timers[type] = setTimeout(() => {
+            if (!isWarping) { 
+                if (type === 'rocket') this.spawnRocket();
+                else if (type === 'satellite') this.spawnSatellite();
+                else if (type === 'comet') this.spawnComet();
+                else if (type === 'astronaut') this.spawnAstronaut();
+            } else {
+                this.scheduleNext(type); // 跃迁中推迟
+            }
+        }, delay);
+    },
+
+    // 辅助：判断是否在屏幕内 (用于卫星轨道计算)
+    isOnScreen: function(x, y, padding = 100) {
+        return x > -padding && x < window.innerWidth + padding && 
+               y > -padding && y < window.innerHeight + padding;
+    },
+
+    // --- 1. 🚀 火箭逻辑 (保持不变) ---
+    spawnRocket: function() {
+        const w = window.innerWidth, h = window.innerHeight;
+        const pad = 150; // 安全边距，确保生成在屏幕外
+        
+        // 1. 随机选择起始边：0=上, 1=右, 2=下, 3=左
+        const startSide = Math.floor(Math.random() * 4);
+        let sx, sy;
+
+        // 计算起始坐标
+        switch(startSide) {
+            case 0: sx = Math.random() * w; sy = -pad; break;          // Top
+            case 1: sx = w + pad; sy = Math.random() * h; break;       // Right
+            case 2: sx = Math.random() * w; sy = h + pad; break;       // Bottom
+            case 3: sx = -pad; sy = Math.random() * h; break;          // Left
+        }
+
+        // 2. 设定结束点：强制选择“对侧”或“相邻侧”，确保路径横跨屏幕
+        let endSide = (startSide + 2) % 4; // 默认对侧
+        if (Math.random() > 0.3) { // 30% 概率去往相邻侧（产生斜向飞行）
+             endSide = (startSide + 1) % 4;
+        }
+        
+        let ex, ey;
+        switch(endSide) {
+            case 0: ex = Math.random() * w; ey = -pad; break;
+            case 1: ex = w + pad; ey = Math.random() * h; break;
+            case 2: ex = Math.random() * w; ey = h + pad; break;
+            case 3: ex = -pad; ey = Math.random() * h; break;
+        }
+
+        // 3. 物理计算
+        const dx = ex - sx, dy = ey - sy;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const duration = dist / (120 + Math.random() * 100); // 速度控制
+        const angle = Math.atan2(dy, dx) * 180 / Math.PI + 45; // 🚀 emoji 修正角度
+
+        this.create2DAgent('🚀', sx, sy, ex, ey, duration, angle);
+        this.scheduleNext('rocket');
+    },
+
+    // --- 2. 🛰️ 卫星逻辑 (移植自 WelcomeScene 的轨道算法) ---
+    spawnSatellite: function() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        
+        let orbit = {};
+        let validOrbitFound = false;
+
+        // 尝试寻找一条能穿过屏幕的完美轨道
+        for(let attempt = 0; attempt < 20; attempt++) {
+            // 随机生成椭圆参数
+            const cx = w/2 + (Math.random() - 0.5) * w * 1.5;
+            const cy = h/2 + (Math.random() - 0.5) * h * 1.5;
+            const rx = Math.max(w, h) * (0.6 + Math.random() * 1.0);
+            const ry = Math.max(w, h) * (0.6 + Math.random() * 1.0);
+            const tilt = Math.random() * Math.PI * 2;
+            
+            // 预扫描：检查轨道是否穿过屏幕区域
+            for(let t = 0; t < Math.PI * 2; t += 0.1) {
+                const pureX = rx * Math.cos(t);
+                const pureY = ry * Math.sin(t);
+                const x = cx + pureX * Math.cos(tilt) - pureY * Math.sin(tilt);
+                const y = cy + pureX * Math.sin(tilt) + pureY * Math.cos(tilt);
+                
+                if (this.isOnScreen(x, y, 0)) {
+                    // 找到入场点，设定起始角度为入场前一点点
+                    orbit = { cx, cy, rx, ry, tilt, theta: t - 0.2, speed: 0.003 + Math.random() * 0.005 };
+                    validOrbitFound = true;
+                    break;
+                }
+            }
+            if(validOrbitFound) break;
+        }
+
+        // 如果找不到有效轨道（极少情况），稍后重试
+        if (!validOrbitFound) {
+            this.scheduleNext('satellite');
+            return;
+        }
+
+        // 创建 DOM 元素
+        const el = document.createElement('div');
+        el.textContent = '🛰️'; 
+        el.className = 'bg-floater';
+        const scale = 0.3 + Math.random() * 1.0;
+        el.style.fontSize = (2.5 * scale) + 'rem';
+        el.style.position = 'absolute';
+        el.style.left = '0'; el.style.top = '0';
+        el.style.willChange = 'transform';
+        this.layer.appendChild(el);
+
+        // 存入活动对象列表 (标记为 orbit 类型)
+        this.active2DObjects.push({
+            type: 'satellite',
+            isOrbit: true, // 标记：使用轨道算法而非线性插值
+            el: el,
+            ...orbit,
+            selfRot: 0,
+            hasEntered: false,
+            creationTime: Date.now() // 用于超时清除
+        });
+
+        this.scheduleNext('satellite');
+    },
+
+    // --- 3. ☄️ 彗星逻辑 (保持不变) ---
+    spawnComet: function() {
+        const w = window.innerWidth, h = window.innerHeight;
+        const pad = 150; 
+
+        // 1. 彗星倾向于从上方(Top)或左右侧上方(Left/Right)落下
+        // 0=Top, 1=Right, 3=Left
+        const startSide = [0, 1, 3][Math.floor(Math.random() * 3)]; 
+        let sx, sy, ex, ey;
+
+        // 起始点计算
+        if (startSide === 0) { sx = Math.random() * w; sy = -pad; } // 从顶部
+        else if (startSide === 1) { sx = w + pad; sy = Math.random() * (h/2); } // 从右侧上半部
+        else { sx = -pad; sy = Math.random() * (h/2); } // 从左侧上半部
+
+        // 2. 结束点计算：大多数去往底部，或者对侧下方
+        const endRand = Math.random();
+        if (endRand > 0.4) {
+            // 60% 概率直接去往底部
+            ex = Math.random() * w; ey = h + pad;
+        } else {
+            // 40% 概率去往对侧下方
+            if (startSide === 1) { ex = -pad; ey = h/2 + Math.random() * (h/2); } // 右->左下
+            else if (startSide === 3) { ex = w + pad; ey = h/2 + Math.random() * (h/2); } // 左->右下
+            else { ex = Math.random() * w; ey = h + pad; } // 上->下
+        }
+
+        // 3. 物理计算
+        const dx = ex - sx, dy = ey - sy;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const duration = dist / (300 + Math.random() * 200); // 彗星速度较快
+        const angle = Math.atan2(dy, dx) * 180 / Math.PI - 135; // ☄️ emoji 角度修正
+
+        this.create2DAgent('☄️', sx, sy, ex, ey, duration, angle);
+        this.scheduleNext('comet');
+    },
+
+    // --- 通用：线性/贝塞尔运动对象创建 (火箭/彗星) ---
+    create2DAgent: function(emoji, sx, sy, ex, ey, duration, rotation) {
+        const el = document.createElement('div');
+        el.textContent = emoji; el.className = 'bg-floater';
+        const scale = 0.2 + Math.random() * 0.6;
+        el.style.fontSize = (2.5 * scale) + 'rem';
+        el.style.position = 'absolute';
+        el.style.left = '0'; el.style.top = '0';
+        el.style.willChange = 'transform';
+        this.layer.appendChild(el);
+
+        this.active2DObjects.push({
+            type: 'linear', // 标记：线性运动
+            el: el,
+            sx: sx, sy: sy, ex: ex, ey: ey,
+            duration: duration * 1000,
+            startTime: Date.now(),
+            rotation: rotation
+        });
+    },
+
+    // --- 4. 👨‍🚀 3D 宇航员逻辑 (保持不变) ---
+    spawnAstronaut: function() {
+        if (activeObjects.length === 0) {
+            this.scheduleNext('astronaut'); return;
+        }
+        const target = activeObjects[Math.floor(Math.random() * activeObjects.length)];
+        const div = document.createElement('div'); 
+        div.className = 'actor-3d'; div.textContent = '👨‍🚀'; div.style.fontSize = '24px';
+        const css = new THREE.CSS3DObject(div);
+        scene.add(css);
+        
+        const lifeTime = 30000 + Math.random() * 60000;
+        this.activeAstronaut = {
+            css: css, targetMesh: target.mesh, startTime: Date.now(), lifeTime: lifeTime,
+            radius: 35, theta: Math.random() * Math.PI * 2, phi: Math.acos(2 * Math.random() - 1),
+            speedTheta: (Math.random() - 0.5) * 0.02, speedPhi: (Math.random() - 0.5) * 0.02
+        };
+        setTimeout(() => {
+            if (this.activeAstronaut && this.activeAstronaut.css === css) {
+                this.removeAstronaut(); this.scheduleNext('astronaut');
+            }
+        }, lifeTime);
+    },
+
+    removeAstronaut: function() {
+        if (!this.activeAstronaut) return;
+        const css = this.activeAstronaut.css;
+        scene.remove(css);
+        if (css.element.parentNode) css.element.parentNode.removeChild(css.element);
+        this.activeAstronaut = null;
+    },
+
+    // --- 5. UFO 逻辑 (70s - 200s) ---
+    loopUFO: function() {
+        const delay = 70000 + Math.random() * 130000;
+        this.timers.ufo = setTimeout(() => {
+            if(!this.activeUFO && activeObjects.length > 0 && !isWarping) this.spawnUFO();
+            this.loopUFO();
+        }, delay);
+    },
+
+    spawnUFO: function() {
+        const div = document.createElement('div'); div.className = 'actor-3d'; div.textContent = '🛸';
+        const css = new THREE.CSS3DObject(div);
+        css.position.set((Math.random()-0.5)*3000, (Math.random()-0.5)*2000, -1000);
+        scene.add(css);
+        const target = activeObjects[Math.floor(Math.random() * activeObjects.length)];
+        new TWEEN.Tween(css.position).to({ x: target.mesh.position.x, y: target.mesh.position.y + 60, z: target.mesh.position.z }, 4000)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .onComplete(() => {
+                this.activeUFO = {
+                    css: css, targetMesh: target.mesh, state: 'staying',
+                    leaveTime: Date.now() + (10000 + Math.random() * 80000)
+                };
+            }).start();
+        this.activeUFO = { css: css, state: 'flying' };
+    },
+
+    // --- 每帧更新 (在 animate 中调用) ---
+    update: function() {
+        const now = Date.now();
+
+        // 1. 更新 2D 元素 (分流处理)
+        for (let i = this.active2DObjects.length - 1; i >= 0; i--) {
+            const obj = this.active2DObjects[i];
+
+            // >>> 分支 A: 轨道运动 (卫星) <<<
+            if (obj.isOrbit) {
+                obj.theta += obj.speed;
+                obj.selfRot += 0.5;
+
+                // 椭圆轨道计算
+                const pureX = obj.rx * Math.cos(obj.theta);
+                const pureY = obj.ry * Math.sin(obj.theta);
+                const curX = obj.cx + pureX * Math.cos(obj.tilt) - pureY * Math.sin(obj.tilt);
+                const curY = obj.cy + pureX * Math.sin(obj.tilt) + pureY * Math.cos(obj.tilt);
+
+                obj.el.style.transform = `translate(${curX}px, ${curY}px) rotate(${obj.selfRot}deg)`;
+
+                // 生命周期管理
+                const onScreen = this.isOnScreen(curX, curY, 150);
+                if (onScreen) obj.hasEntered = true;
+                
+                // 如果已进入过屏幕，现在又飞出去了，或者时间过长(防止死循环)，则销毁
+                if ((obj.hasEntered && !onScreen) || (now - obj.creationTime > 60000)) {
+                    if (obj.el.parentNode) obj.el.parentNode.removeChild(obj.el);
+                    this.active2DObjects.splice(i, 1);
+                }
+            } 
+            // >>> 分支 B: 线性运动 (火箭/彗星) <<<
+            else {
+                const elapsed = now - obj.startTime;
+                const t = elapsed / obj.duration;
+
+                if (t >= 1) {
+                    if (obj.el.parentNode) obj.el.parentNode.removeChild(obj.el);
+                    this.active2DObjects.splice(i, 1);
+                    continue;
+                }
+
+                const curX = obj.sx + (obj.ex - obj.sx) * t;
+                const curY = obj.sy + (obj.ey - obj.sy) * t;
+                obj.el.style.transform = `translate(${curX}px, ${curY}px) rotate(${obj.rotation}deg)`;
+            }
+        }
+
+        // 2. 更新 3D 宇航员
+        if (this.activeAstronaut) {
+            const a = this.activeAstronaut;
+            if (!a.targetMesh.parent) {
+                this.removeAstronaut();
+                this.scheduleNext('astronaut');
+            } else {
+                a.theta += a.speedTheta; a.phi += a.speedPhi;
+                const r = 40;
+                const lx = r * Math.sin(a.phi) * Math.cos(a.theta);
+                const ly = r * Math.sin(a.phi) * Math.sin(a.theta);
+                const lz = r * Math.cos(a.phi);
+                a.css.position.set(a.targetMesh.position.x + lx, a.targetMesh.position.y + ly, a.targetMesh.position.z + lz);
+                a.css.lookAt(a.targetMesh.position); a.css.rotateX(Math.PI / 2);
+            }
+        }
+
+        // 3. 更新 UFO
+        if(this.activeUFO && this.activeUFO.state === 'staying') {
+            const u = this.activeUFO;
+            if(Date.now() > u.leaveTime || !u.targetMesh.parent) {
+                u.state = 'leaving';
+                new TWEEN.Tween(u.css.position).to({ y: 2000, z: -3000 }, 3000).easing(TWEEN.Easing.Back.In)
+                    .onComplete(() => {
+                        scene.remove(u.css); if(u.css.element.parentNode) u.css.element.parentNode.removeChild(u.css.element);
+                        this.activeUFO = null;
+                    }).start();
+            } else {
+                u.css.position.copy(u.targetMesh.position).add(new THREE.Vector3(0, 60, 0));
+                u.css.lookAt(camera.position);
+            }
+        }
+    }
+};
+
+// ================= 3. 欢迎界面特效逻辑 (WelcomeScene) - 最终整合版 =================
+const WelcomeScene = {
+    running: false, frameId: null,
+    astronaut: { el: null, btn: null, pos: 0, noiseSeed: Math.random() * 100 },
+    rocket: { el: null, x: 0, y: 0, vx: 0, vy: 0, width: 40, height: 40, state: 'flying', crashTime: 0 },
+    crawlers: [ { id: 'ufo', speed: 2, pos: 0, wall: 0 } ],
+    
+    // 卫星对象：支持智能弧线轨道
+    satellite: { 
+        el: null, 
+        active: false, 
+        nextSpawnTime: 0, 
+        cx: 0, cy: 0, rx: 0, ry: 0, tilt: 0, theta: 0, speed: 0, selfRot: 0,
+        hasEntered: false 
+    },
+    
+    init: function() {
+        this.astronaut.el = document.getElementById('astronaut');
+        this.astronaut.btn = document.getElementById('start-btn-container');
+        this.rocket.el = document.getElementById('rocket'); 
+        this.satellite.el = document.getElementById('satellite');
+
+        // [修复] 全局坐标归零，解决所有元素的偏移问题
+        ['rocket', 'satellite', 'ufo'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) {
+                el.style.left = '0px'; 
+                el.style.top = '0px';
+                el.style.transformOrigin = 'center center';
+                el.style.display = 'block';
+            }
+        });
+        // [卫星] 初始化：隐身并移到极远处，防止左上角闪烁
+        if (this.satellite.el) {
+            this.satellite.active = false;
+            this.satellite.el.style.opacity = '0';
+            this.satellite.el.style.transform = 'translate(-9999px, -9999px)';
+            this.satellite.nextSpawnTime = Date.now() + 1000;
+        }
+
+        // [火箭] 初始化：立即计算并应用位置，防止闪烁
+        if (this.rocket.el) {
+            this.resetRocket();
+            const angle = Math.atan2(this.rocket.vy, this.rocket.vx) * 180 / Math.PI + 45;
+            this.rocket.el.style.transform = `translate(${this.rocket.x}px, ${this.rocket.y}px) rotate(${angle}deg)`;
+        }
+        
+        // [UFO] 初始化位置修正
+        this.crawlers.forEach(c => {
+            const el = document.getElementById(c.id);
+            if(el) el.style.transform = 'translate(0px, 5px)'; 
+        });
+        this.running = true; 
+        this.loop();
+    },
+    
+    stop: function() { 
+        this.running = false;
+        if(this.frameId) cancelAnimationFrame(this.frameId); 
+    },
+    
+    resetRocket: function() {
+        const w = window.innerWidth, h = window.innerHeight;
+        // 在屏幕中间区域生成
+        this.rocket.x = Math.random() * (w - 100) + 50;
+        this.rocket.y = h - 50; // 底部上方
+        this.rocket.vx = (Math.random() - 0.5) * 6;
+        this.rocket.vy = - (Math.random() * 3 + 2); // 向上冲
+        this.rocket.state = 'flying';
+        this.rocket.el.classList.remove('rocket-crashed'); 
+    },
+    
+    // 判断点是否在屏幕可见区域 (padding 用于宽松判断)
+    isOnScreen: function(x, y, padding = 100) {
+        return x > -padding && x < window.innerWidth + padding && 
+               y > -padding && y < window.innerHeight + padding;
+    },
+
+    // [卫星核心] 生成必然穿过屏幕的弧线
+    spawnSatellite: function() {
+        const s = this.satellite;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        let validOrbitFound = false;
+        // 尝试寻找完美轨道
+        for(let attempt = 0; attempt < 20; attempt++) {
+            // 参数随机化：允许中心点偏离屏幕较远以形成平缓弧线
+            s.cx = w/2 + (Math.random() - 0.5) * w * 1.5;
+            s.cy = h/2 + (Math.random() - 0.5) * h * 1.5;
+            s.rx = Math.max(w, h) * (0.6 + Math.random() * 1.0);
+            s.ry = Math.max(w, h) * (0.6 + Math.random() * 1.0);
+            s.tilt = Math.random() * Math.PI * 2;
+            s.speed = 0.003 + Math.random() * 0.005;
+            // 预模拟扫描：寻找入场点
+            let entryAngle = null;
+            for(let t = 0; t < Math.PI * 2; t += 0.05) {
+                const pureX = s.rx * Math.cos(t);
+                const pureY = s.ry * Math.sin(t);
+                const x = s.cx + pureX * Math.cos(s.tilt) - pureY * Math.sin(s.tilt);
+                const y = s.cy + pureX * Math.sin(s.tilt) + pureY * Math.cos(s.tilt);
+                if (this.isOnScreen(x, y, 0)) { // 严格边界检测
+                    entryAngle = t;
+                    break;
+                }
+            }
+
+            if (entryAngle !== null) {
+                // 设置起始角度为入场点稍前的位置
+                s.theta = entryAngle - 0.3;
+                validOrbitFound = true;
+                break;
+            }
+        }
+
+        if (validOrbitFound) {
+            s.active = true;
+            s.hasEntered = false;
+            s.el.style.opacity = '1'; // 显形
+        } else {
+            s.nextSpawnTime = Date.now() + 100;
+            // 失败重试
+        }
+    },
+
+    updateSatellite: function() {
+        const s = this.satellite;
+        if (!s.active) {
+            if (Date.now() > s.nextSpawnTime) {
+                this.spawnSatellite();
+            }
+            return;
+        }
+
+        // 运动计算
+        s.theta += s.speed;
+        s.selfRot += 0.5;
+
+        const pureX = s.rx * Math.cos(s.theta);
+        const pureY = s.ry * Math.sin(s.theta);
+        const finalX = s.cx + pureX * Math.cos(s.tilt) - pureY * Math.sin(s.tilt);
+        const finalY = s.cy + pureX * Math.sin(s.tilt) + pureY * Math.cos(s.tilt);
+
+        s.el.style.transform = `translate(${finalX}px, ${finalY}px) rotate(${s.selfRot}deg)`;
+        // 生命周期管理
+        const onScreen = this.isOnScreen(finalX, finalY, 150);
+        if (onScreen) {
+            s.hasEntered = true;
+        } else {
+            if (s.hasEntered) {
+                // 飞出屏幕，任务结束
+                s.active = false;
+                s.el.style.opacity = '0';
+                // 随机间隔 5-15秒
+                s.nextSpawnTime = Date.now() + 5000 + Math.random() * 10000;
+            }
+        }
+    },
+
+    noise: function(x) { 
+        return Math.sin(x) * 0.5 + Math.sin(x * 2.3) * 0.25 + Math.sin(x * 5.7) * 0.125;
+    },
+    
+    loop: function() {
+        if(!this.running) return;
+        this.updateAstronaut(); 
+        this.updateRocket(); 
+        this.updateSatellite(); 
+        this.updateCrawlers();
+        this.frameId = requestAnimationFrame(this.loop.bind(this));
+    },
+    
+    updateAstronaut: function() {
+        const btn = this.astronaut.btn;
+        const walker = this.astronaut.el; if(!btn || !walker) return;
+        const rect = btn.getBoundingClientRect(); const w = rect.width; const h = rect.height;
+        const perimeter = 2 * (w + h);
+        this.astronaut.noiseSeed += 0.02; const n = this.noise(this.astronaut.noiseSeed);
+        let moveStep = (n + 0.3) * 4; 
+        this.astronaut.pos += moveStep;
+        if(this.astronaut.pos < 0) this.astronaut.pos += perimeter;
+        if(this.astronaut.pos > perimeter) this.astronaut.pos -= perimeter;
+        let x = 0, y = 0, rot = 0; const p = this.astronaut.pos;
+        // [调整] 宇航员偏移量，适配缩小后的尺寸 (20x20)
+        const offsetX = 10; const offsetY = 20;
+        if (p < w) { x = p; y = 0; rot = 0;
+        } 
+        else if (p < w + h) { x = w;
+        y = p - w; rot = 90; } 
+        else if (p < w + h + w) { x = w - (p - (w + h));
+        y = h; rot = 180; } 
+        else { x = 0;
+        y = h - (p - (w + h + w)); rot = 270;
+        }
+        
+        walker.style.transform = `translate(${x - offsetX}px, ${y - offsetY}px) rotate(${rot}deg)`;
+        if(moveStep < 0) walker.style.transform += " scaleX(-1)";
+    },
+    
+    updateRocket: function() {
+        const r = this.rocket;
+        if(r.state === 'crashed') { 
+            if (Date.now() - r.crashTime > 5000) this.resetRocket();
+            return; 
+        }
+        if(r.state === 'resetting') return;
+        
+        r.x += r.vx; r.y += r.vy;
+        const angle = Math.atan2(r.vy, r.vx) * 180 / Math.PI + 45; 
+        r.el.style.transform = `translate(${r.x}px, ${r.y}px) rotate(${angle}deg)`;
+        
+        const pad = 20;
+        const maxW = window.innerWidth - pad; const maxH = window.innerHeight - pad;
+        if(r.x <= pad || r.x >= maxW) { r.vx *= -1; r.x = Math.max(pad, Math.min(r.x, maxW));
+        }
+        if(r.y <= pad) { r.vy *= -1; r.y = pad;
+        }
+        if(r.y >= maxH) { 
+            r.state = 'crashed';
+            r.crashTime = Date.now(); 
+            r.el.classList.add('rocket-crashed'); 
+            r.el.style.transform = `translate(${r.x}px, ${maxH}px) rotate(90deg)`; 
+        }
+    },
+
+    updateCrawlers: function() {
+        const w = window.innerWidth;
+        const h = window.innerHeight; const margin = 5; 
+        this.crawlers.forEach(c => {
+            const el = document.getElementById(c.id); if(!el) return;
+            const elSize = el.offsetWidth || 40; 
+            c.pos += c.speed; 
+            let limit = 0; if(c.wall === 0 || c.wall === 2) limit = w; else limit = h;
+            if(c.pos > limit) { c.pos = 0; c.wall = (c.wall + 1) % 4; }
+            let tx = 0, ty = 0; 
+            if (c.wall === 0) { tx = c.pos; ty = margin; } 
+            else if (c.wall === 1) { tx = w - margin - elSize; ty = c.pos; } 
+            else 
+            if (c.wall === 2) { tx = w - c.pos; ty = h - margin - elSize; } 
+            else if (c.wall === 3) { tx = margin; ty = h - c.pos; }
+            el.style.transform = `translate(${tx}px, ${ty}px)`;
+        });
+    }
+};
+
+// ================= 4. 游戏逻辑控制器 (CONTROLLER) =================
+const GameController = {
+    startFirstRound: function(mode) {
+        // 1. 必须先初始化音频 (响应用户点击)
+        SoundManager.init(); 
+        // 2. 必须先初始化3D环境，否则跃迁光效没有容器
+        init3D(); 
+
+        // 3. 调用跃迁函数，将切换逻辑放入回调
+        performWarpJump(() => {
+            currentMode = mode;
+            
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('ui-layer').classList.remove('hidden');
+            WelcomeScene.stop();
+
+            // --- 数据加载 ---
+            if (currentMode === 'normal') {
+                finishedGroupIds = GameData.normal.finishedIds;
+                collectedItems = GameData.normal.collected;
+                document.getElementById('main-ore-icon').classList.remove('red');
+                document.getElementById('progress-bar').style.display = 'block';
+                document.getElementById('hint-btn').style.display = 'block';
+            } else {
+                usedCollageIds = GameData.collage.usedIds;
+                collectedItems = GameData.collage.collected;
+                document.getElementById('main-ore-icon').classList.add('red');
+                document.getElementById('progress-bar').style.display = 'none'; 
+                document.getElementById('hint-btn').style.display = 'none'; 
+            }
+
+            // --- 按钮样式 ---
+            const switchBtn = document.getElementById('mode-switch-btn');
+            if (currentMode === 'normal') {
+                switchBtn.innerHTML = '<span>✦</span> 切换拼贴诗';
+                switchBtn.style.borderColor = '#ff99cc'; 
+                switchBtn.style.color = '#ff99cc';
+            } else {
+                switchBtn.innerHTML = '<span>☀</span> 切换正常模式';
+                switchBtn.style.borderColor = '#4fc3f7'; 
+                switchBtn.style.color = '#4fc3f7';
+            }
+            
+            document.getElementById('ore-num').textContent = collectedItems.length;
+            document.getElementById('ore-counter').style.display = 'flex';
+            
+            createSpaceDust(); // 补充尘埃
+            this.startLevel();
+        });
+    },
+
+    triggerWarp: function() {
+        if(isWarping) return;
+        document.getElementById('next-round-screen').classList.add('hidden');
+        performWarpJump(() => {
+            // [新增] 刷新星空和尘埃
+            createStarfield();
+            createSpaceDust();
+            
+            clearBackgroundBelt();
+            createBackgroundBelt();
+            this.startLevel();
+        });
+    },
+
+    refreshLevel: function() {
+        if(isWarping) return;
+        performWarpJump(() => {
+            mismatchCount = 0;
+            orderErrorCount = 0;
+            document.getElementById('hint-btn').classList.remove('visible');
+            
+            // [修改] 只有在非拼贴模式(即正常模式)下，刷新才清空备选栏
+            // 这样拼贴模式下点击刷新，已选碎片会保留
+            if (currentMode !== 'collage') {
+                selectionSlot = [];
+            }
+
+            renderSlots();
+            document.getElementById('confirm-btn').classList.remove('visible');
+      
+            // [新增] 刷新星空和尘埃
+            createStarfield();
+            createSpaceDust();
+        
+            // 强制重置背景
+            clearBackgroundBelt();
+            createBackgroundBelt();
+            
+            this.startLevel();
+            showToast("矿区坐标已重置", "success");
+        });
+    },
+
+    switchGameMode: function() {
+        if(isWarping) return;
+        const targetMode = currentMode === 'normal' ? 'collage' : 'normal';
+        
+        performWarpJump(() => {
+            // 1. 清理场景
+            activeObjects.forEach(obj => {
+                scene.remove(obj.css); scene.remove(obj.mesh); if(obj.ringMesh) scene.remove(obj.ringMesh);
+                if(obj.css.element && obj.css.element.parentNode) obj.css.element.parentNode.removeChild(obj.css.element);
+            });
+            activeObjects = [];
+            
+            // 刷新环境
+            createStarfield();
+            createSpaceDust();
+            clearBackgroundBelt(); 
+            
+            // 重置 UI
+            selectionSlot = [];
+            renderSlots();
+            document.getElementById('confirm-btn').classList.remove('visible');
+            document.getElementById('next-round-screen').classList.add('hidden');
+
+            // 2. 【核心修复】手动切换数据状态，不再调用 startFirstRound，避免二次跃迁
+            currentMode = targetMode;
+            
+            if (currentMode === 'normal') {
+                finishedGroupIds = GameData.normal.finishedIds;
+                collectedItems = GameData.normal.collected;
+                document.getElementById('main-ore-icon').classList.remove('red');
+                document.getElementById('progress-bar').style.display = 'block';
+                document.getElementById('hint-btn').style.display = 'block';
+                
+                // 按钮样式更新
+                const switchBtn = document.getElementById('mode-switch-btn');
+                switchBtn.innerHTML = '<span>✦</span> 切换拼贴诗';
+                switchBtn.style.borderColor = '#ff99cc'; 
+                switchBtn.style.color = '#ff99cc';
+            } else {
+                usedCollageIds = GameData.collage.usedIds;
+                collectedItems = GameData.collage.collected;
+                document.getElementById('main-ore-icon').classList.add('red');
+                document.getElementById('progress-bar').style.display = 'none'; 
+                document.getElementById('hint-btn').style.display = 'none';
+                
+                // 按钮样式更新
+                const switchBtn = document.getElementById('mode-switch-btn');
+                switchBtn.innerHTML = '<span>☀</span> 切换正常模式';
+                switchBtn.style.borderColor = '#4fc3f7'; 
+                switchBtn.style.color = '#4fc3f7';
+            }
+            
+            // 更新矿石计数
+            document.getElementById('ore-num').textContent = collectedItems.length;
+
+            // 3. 直接启动关卡生成
+            this.startLevel();
+            showToast("模式已切换", "success");
+        });
+    },
+
+    // 返航逻辑
+    returnToHome: function() {
+        if(isWarping) return;
+        performWarpJump(() => {
+            // 1. 清理前景
+            activeObjects.forEach(obj => {
+                scene.remove(obj.css); scene.remove(obj.mesh); if(obj.ringMesh) scene.remove(obj.ringMesh);
+                if(obj.css.element && obj.css.element.parentNode) obj.css.element.parentNode.removeChild(obj.css.element);
+            });
+            activeObjects = [];
+      
+            
+            // [IMPORTANT] 不清除背景，让它保留在欢迎界面
+
+            // 2. 隐藏游戏UI
+            document.getElementById('ui-layer').classList.add('hidden');
+            document.getElementById('ore-counter').style.display = 'none';
+            document.getElementById('next-round-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.add('hidden');
+
+            // 3. 重置临时状态（不重置GameData）
+            selectionSlot = [];
+            renderSlots();
+            document.getElementById('confirm-btn').classList.remove('visible');
+
+            // 4. 显示欢迎界面
+            document.getElementById('start-screen').classList.remove('hidden');
+            WelcomeScene.init();
+        });
+    },
+
+    startLevel: function() {
+        currentRingColor = generateSoftColor();
+        // [AUTO-FIX] 自动检测背景，如果缺失则补充
+        if (!bgGroup) {
+            createBackgroundBelt();
+        }
+
+        // 清理当前场景中的活动对象
+        activeObjects.forEach(obj => {
+            scene.remove(obj.css); scene.remove(obj.mesh); if(obj.ringMesh) scene.remove(obj.ringMesh); 
+            if(obj.css.element && obj.css.element.parentNode) obj.css.element.parentNode.removeChild(obj.css.element);
+        });
+        activeObjects = [];
+
+        // ==========================================
+        // 核心修改逻辑开始
+        // ==========================================
+        if (currentMode === 'collage') {
+            // >>> 拼贴模式新逻辑：全文本打散，随机抽取 9-12 行 <<<
+            
+            // 1. 提取所有诗歌的所有行到大池子中
+            let globalLinePool = [];
+            allGroups.forEach(group => {
+                // 将每组的 lines 拼接到大数组中
+                globalLinePool = globalLinePool.concat(group.lines);
+            });
+
+            // 2. 计算随机数量 (9 到 12 之间)
+            // Math.random() 生成 0-1，乘以 4 得到 0-3.99，向下取整为 0,1,2,3，加 9 得到 9,10,11,12
+            const minLines = 9;
+            const maxLines = 12;
+            const randomCount = Math.floor(Math.random() * (maxLines - minLines + 1)) + minLines;
+
+            // 3. 彻底乱序并取前 randomCount 个
+            const randomMixedLines = globalLinePool.sort(() => 0.5 - Math.random()).slice(0, randomCount);
+
+            // 4. 包装成 spawnTextAsteroids 函数能识别的格式
+            activeGroups = [{
+                id: 'collage_mixed_' + Date.now(), // 随机ID
+                lines: randomMixedLines
+            }];
+
+        } else {
+            // >>> 正常模式原逻辑：严格保留，未做任何修改 <<<
+            
+            let availableGroups = [];
+            if (finishedGroupIds.length >= allGroups.length) {
+                this.showEndScreen();
+                return;
+            }
+            availableGroups = allGroups.filter(g => !finishedGroupIds.includes(g.id));
+            
+            if(availableGroups.length === 0) {
+                this.showEndScreen();
+                return;
+            }
+
+            const count = Math.min(3, availableGroups.length);
+            const shuffled = availableGroups.sort(() => 0.5 - Math.random());
+            activeGroups = shuffled.slice(0, count);
+        }
+        // ==========================================
+        // 核心修改逻辑结束
+        // ==========================================
+
+        camera.position.set(0, 0, 0);
+        camera.rotation.set(0, 0, 0);
+
+        spawnTextAsteroids(activeGroups);
+        
+        // 仅在正常模式下更新进度条
+        if (currentMode === 'normal') updateProgressBar();
+    },
+
+    showNextRoundScreen: function() {
+        const screen = document.getElementById('next-round-screen');
+        screen.classList.remove('hidden');
+    },
+
+    showEndScreen: function() {
+        const screen = document.getElementById('end-screen');
+        document.getElementById('stats').textContent = `共收集诗歌碎片 ${finishedGroupIds.length} 组`;
+        screen.classList.remove('hidden');
+    }
+};
+
+// ================= 5. 3D 环境初始化 (ENGINE) =================
+function init3D() {
+    if (scene) return;
+    const container = document.getElementById('canvas-container');
+    const cssContainer = document.getElementById('css3d-container');
+    scene = new THREE.Scene();
+    // [Visual] 增强雾气
+    scene.fog = new THREE.FogExp2(0x020205, 0.00025);
+    
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 25000);
+    camera.position.set(0, 0, 0);
+    renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.physicallyCorrectLights = true;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    container.appendChild(renderer.domElement);
+    labelRenderer = new THREE.CSS3DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0';
+    cssContainer.appendChild(labelRenderer.domElement);
+    // [Visual] 增强光照系统
+    const ambientLight = new THREE.AmbientLight(0x4a4a4a, 2.5); 
+    scene.add(ambientLight);
+    const pointLight = new THREE.PointLight(0xffffff, 6.0, 2500);
+    pointLight.position.set(200, 300, 400);
+    scene.add(pointLight);
+    const rimLight = new THREE.DirectionalLight(0xcceeff, 4.0); 
+    rimLight.position.set(-1, 0.5, -0.5);
+    scene.add(rimLight);
+    
+    // ... 原有代码 ...
+    createStarfield();
+    // 初始创建一次，后续由 startLevel 维护
+    createBackgroundBelt(); 
+    createSpaceDust(); // [新增] 初始化尘埃系统
+    
+    // [修改] 鼠标监听：同时记录归一化坐标(用于点击)和屏幕坐标(用于惯性)
+    window.addEventListener('mousemove', (event) => {
+        // 1. Raycaster 用
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        
+        // 2. 驾驶舱惯性用
+        mouseX = (event.clientX - windowHalfX);
+        mouseY = (event.clientY - windowHalfY);
+    });
+    
+    // ... 后续代码 (window.addEventListener('click'... ) 保持不变 ...
+    window.addEventListener('click', (event) => {
+        if(isWarping) return;
+        if (event.target.closest('#ui-layer') || event.target.closest('#ore-counter') || event.target.closest('#collection-modal') || event.target.closest('.btn-wrapper') || event.target.closest('.btn-inner') || event.target.closest('.hud-btn') || event.target.closest('#start-screen') || event.target.closest('.btn-small-wrapper') || event.target.closest('#end-download-section')) {
+            return;
+        }
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(activeObjects.map(o => o.mesh));
+        if (intersects.length > 0) {
+          
+            const hitMesh = intersects[0].object;
+            const targetObj = activeObjects.find(o => o.mesh === hitMesh);
+            if (targetObj && targetObj.css.element.style.pointerEvents !== 'none') {
+                const ud = targetObj.css.userData;
+                const lineData = { txt: ud.text, idx: ud.lineIndex };
+                
+                // 确保这里有这一行调用：
+                SoundManager.playRockMetal();
+                
+                addToSlot(lineData, ud.groupId, targetObj.css);
+            }
+        }
+    });
+    window.addEventListener('resize', onWindowResize, false);
+    animate();
+
+    // 修改点：为 slot-area 增加 drop 监听，以支持“拖拽到最下方”
+    const slotContainer = document.getElementById('slot-area');
+    if(slotContainer) {
+        slotContainer.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+        slotContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            // 如果目标是 container 本身（说明拖到了空白处），则将 item 移动到末尾
+            if(e.target.id === 'slot-area' && dragSrcEl) {
+                 const srcIndex = parseInt(dragSrcEl.dataset.index);
+                 if(!isNaN(srcIndex) && srcIndex >= 0 && srcIndex < selectionSlot.length) {
+                     const item = selectionSlot.splice(srcIndex, 1)[0];
+                     selectionSlot.push(item);
+                     setTimeout(() => { renderSlots(); checkCombination(); }, 0);
+                 }
+            }
+        });
+    }
+}
+
+window.onload = function() {
+    init3D();
+    WelcomeScene.init();
+    AtmosphereManager.init(); // [新增] 启动生态系统
+
+    // [新增] 全局交互监听：点击任意空白处（包括欢迎界面）启动/恢复环境音效
+    const enableGlobalAudio = () => {
+        // 如果未初始化则初始化，如果已挂起则恢复
+        SoundManager.init();
+        if (SoundManager.ctx && SoundManager.ctx.state === 'suspended') {
+            SoundManager.ctx.resume();
+        }
+    };
+    // 监听点击和触摸，确保移动端也能生效
+    document.addEventListener('click', enableGlobalAudio);
+    document.addEventListener('touchstart', enableGlobalAudio);
+}
+
+// [Visual] 移植 v5.6 的多层级星空 (密度增加30% + 大亮星)
+function createStarfield() {
+    if(starField) scene.remove(starField);
+    starField = new THREE.Group();
+    const getGlowTexture = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        grad.addColorStop(0, 'rgba(255, 255, 255, 1)'); grad.addColorStop(0.2, 'rgba(255, 255, 255, 0.8)'); grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)'); grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = grad; ctx.fillRect(0, 0, 32, 32);
+        return new THREE.CanvasTexture(canvas);
+    };
+    const glowTex = getGlowTexture();
+    // [Logic Change] 增加星星数量 (密度增加 ~40%)
+    const starTypes = [ 
+        { count: 45000, size: 15, opacity: 0.3, colors: [0x556677, 0x334455, 0x222222] }, 
+        { count: 30000, size: 35, opacity: 0.4, colors: [0x440066, 0x003366, 0x660033, 0x110033] }, 
+        { count: 20000, size: 45, opacity: 0.8, colors: [0xffffff, 0xffffee, 0xffddcc] }, 
+        { count: 1800, size: 90, opacity: 0.9, colors: [0xff4422, 0xff8844, 0xff6633] }, 
+      
+        { count: 850, size: 60, opacity: 1.0, colors: [0xaaccff, 0xccddff, 0xffffff] },
+        { count: 360, size: 180, opacity: 1.0, colors: [0xffffff, 0xaaddff] },
+{ 
+    count: 6,               // 数量极少 (5-10个即可)
+    size: 1000 + Math.random() * 2000,             // 尺寸极大 (形成弥散的光晕)
+    opacity: 0.2,          // 透明度极低 (朦胧感，不抢眼)
+    colors: [0x4b0082, 0x800080, 0x00008b, 0xff1493] // 星云色：深紫、紫罗兰、深蓝、深粉
+}
+    ];
+    // [Logic Change] 极远景星空 -5000 到 -7000
+    const Z_NEAR = -5000; const Z_FAR = -6000;
+    starTypes.forEach(type => {
+        const geo = new THREE.BufferGeometry(); const pos = []; const cols = [];
+        for(let i=0; i<type.count; i++) {
+            const x = (Math.random() - 0.5) * 50000; const y = (Math.random() - 0.5) * 30000; const z = Z_FAR + Math.random() * (Z_NEAR - Z_FAR);
+            pos.push(x, y, z);
+            const color = 
+            new THREE.Color(); const cHex = type.colors[Math.floor(Math.random() * type.colors.length)];
+            color.setHex(cHex); color.multiplyScalar(0.8 + Math.random() * 0.4); cols.push(color.r, color.g, color.b);
+        }
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+        const mat = new THREE.PointsMaterial({ size: type.size, map: glowTex, transparent: true, opacity: type.opacity, vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+        starField.add(new THREE.Points(geo, mat));
+    });
+    scene.add(starField);
+}
+
+// [Visual] 移植 v5.6 的高级纹理生成器
+function createAsteroidMaps(style = 0) {
+    const size = 512;
+    const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#808080';
+    ctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 60000; i++) { const val = Math.floor(Math.random() * 60 + 90);
+    ctx.fillStyle = `rgba(${val},${val},${val}, 0.5)`; ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
+    }
+    if (style === 0) { for (let i = 0; i < 25; i++) { const x = Math.random() * size;
+    const y = Math.random() * size; const r = 5 + Math.random() * 35;
+    const g = ctx.createRadialGradient(x, y, r * 0.1, x, y, r); g.addColorStop(0, '#333333'); g.addColorStop(0.8, '#666666'); g.addColorStop(1, 'rgba(100,100,100,0)'); ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = 'rgba(200,200,200,0.1)'; ctx.lineWidth = 1; ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke(); } } 
+    else if (style === 1) { for(let i=0; i<40; i++) { const y = Math.random() * size;
+    const h = Math.random() * 20 + 5; ctx.fillStyle = `rgba(30, 30, 30, ${Math.random() * 0.3})`; ctx.fillRect(0, y, size, h);
+    ctx.beginPath(); ctx.moveTo(0, y + h/2); ctx.lineTo(size, y + h/2 + (Math.random()-0.5)*20); ctx.strokeStyle = `rgba(0,0,0,0.4)`; ctx.stroke();
+    } }
+    else if (style === 2) { for(let i=0; i<150; i++) { ctx.beginPath();
+    ctx.moveTo(Math.random() * size, Math.random() * size); ctx.lineTo(Math.random() * size, Math.random() * size); ctx.lineTo(Math.random() * size, Math.random() * size);
+    ctx.fillStyle = `rgba(20, 20, 20, ${Math.random() * 0.4})`; ctx.fill(); } }
+    else if (style === 3) { for(let i=0; i<100; i++) { ctx.beginPath();
+    const x1 = Math.random() * size; const y1 = Math.random() * size; const len = Math.random() * 100 + 20;
+    const ang = Math.random() * Math.PI * 2; ctx.moveTo(x1, y1); ctx.lineTo(x1 + Math.cos(ang)*len, y1 + Math.sin(ang)*len);
+    ctx.lineWidth = Math.random() * 2 + 0.5; ctx.strokeStyle = `rgba(20, 20, 20, ${Math.random() * 0.6})`; ctx.stroke();
+    } }
+    else if (style === 4) { ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 1.5;
+    for(let i=0; i<30; i++) { ctx.beginPath(); let x = Math.random() * size; let y = Math.random() * size; ctx.moveTo(x, y);
+    for(let j=0; j<5; j++) { x += (Math.random() - 0.5) * 100; y += (Math.random() - 0.5) * 100;
+    ctx.lineTo(x, y); } ctx.stroke(); } }
+    else if (style === 5) { for (let i = 0; i < 20000; i++) { const val = Math.floor(Math.random() * 40 + 30);
+    ctx.fillStyle = `rgba(${val},${val},${val}, 0.2)`; const r = Math.random() * 3 + 1; ctx.beginPath();
+    ctx.arc(Math.random() * size, Math.random() * size, r, 0, Math.PI*2); ctx.fill();
+    } }
+    else if (style === 6) { for (let i = 0; i < 80000; i++) { const val = Math.floor(Math.random() * 100);
+    ctx.fillStyle = `rgba(${val},${val},${val}, 0.4)`; ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
+    } }
+    else if (style === 7) { ctx.fillStyle = '#333'; ctx.fillRect(0,0,size,size);
+    for(let i=0; i<500; i++) { const r = Math.random() * 8 + 2; ctx.beginPath(); ctx.arc(Math.random()*size, Math.random()*size, r, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fill(); } }
+    else if (style === 8) { for(let i=0; i<10000; i++) { const x = Math.random() * size;
+    const y = Math.random() * size; const w = Math.random() * 10; const h = Math.random() * 5;
+    ctx.fillStyle = `rgba(40,40,40, ${Math.random() * 0.5})`; ctx.fillRect(x, y, w, h);
+    } }
+    else if (style === 9) { for(let i=0; i<50; i++) { const x = Math.random() * size;
+    const y = Math.random() * size; const r = Math.random() * 80 + 20; const g = ctx.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0, 'rgba(60,30,10,0.6)');
+    g.addColorStop(1, 'rgba(60,30,10,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); } }
+    else if (style === 10) { ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(200,200,200,0.2)'; for(let i=0; i<200; i++) { const angle = (Math.floor(Math.random()*3) * 60) * Math.PI / 180;
+    const x = Math.random() * size; const y = Math.random() * size; const len = size; ctx.beginPath();
+    ctx.moveTo(x - Math.cos(angle)*len, y - Math.sin(angle)*len); ctx.lineTo(x + Math.cos(angle)*len, y + Math.sin(angle)*len); ctx.stroke();
+    } }
+    
+    const baseMap = new THREE.CanvasTexture(canvas);
+    const imgData = ctx.getImageData(0, 0, size, size); const data = imgData.data; const normalCanvas = document.createElement('canvas'); normalCanvas.width = size;
+    normalCanvas.height = size; const normalCtx = normalCanvas.getContext('2d'); const normalImgData = normalCtx.createImageData(size, size); const nData = normalImgData.data;
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const idx = (y * size + x) * 4;
+            const r = data[idx];
+            const xR = (x + 1 < size) ?
+            data[((y * size + x + 1) * 4)] : r; const xL = (x - 1 >= 0) ?
+            data[((y * size + x - 1) * 4)] : r; const yB = (y + 1 < size) ?
+            data[(((y + 1) * size + x) * 4)] : r; const yT = (y - 1 >= 0) ?
+            data[(((y - 1) * size + x) * 4)] : r;
+            const dx = (xR - xL) / 255.0;
+            const dy = (yB - yT) / 255.0;
+            let dz = 0.8; if (style === 3) dz = 0.3;
+            if (style === 7) dz = 0.5; if (style === 8) dz = 0.4; 
+            let nx = -dx;
+            let ny = -dy; let nz = dz; const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+            nData[idx] = (nx / len * 0.5 + 0.5) * 255;
+            nData[idx + 1] = (ny / len * 0.5 + 0.5) * 255;
+            nData[idx + 2] = (nz / len * 0.5 + 0.5) * 255; nData[idx + 3] = 255;
+            }
+    }
+    normalCtx.putImageData(normalImgData, 0, 0); const normalMap = new THREE.CanvasTexture(normalCanvas);
+    const roughCanvas = document.createElement('canvas');
+    roughCanvas.width = size; roughCanvas.height = size; const roughCtx = roughCanvas.getContext('2d');
+    let baseRough = '#cccccc';
+    if (style === 3) baseRough = '#444444'; if (style === 4) baseRough = '#222222';
+    if (style === 10) baseRough = '#666666'; 
+    roughCtx.fillStyle = baseRough; roughCtx.fillRect(0, 0, size, size);
+    let shineCount = 300;
+    if (style === 2 || style === 3 || style === 6) shineCount = 600;
+    if (style === 7 || style === 9) shineCount = 50;
+    for(let i=0; i<shineCount; i++) { const x = Math.random() * size; const y = Math.random() * size;
+    const w = Math.random() * 15; const h = Math.random() * 15;
+    let spotColor = `rgba(30, 30, 30, ${Math.random() * 0.6})`; if (style === 5) spotColor = `rgba(180, 180, 180, 0.1)`;
+    roughCtx.fillStyle = spotColor; roughCtx.fillRect(x, y, w, h); }
+    const roughnessMap = new THREE.CanvasTexture(roughCanvas);
+    return { baseMap, normalMap, roughnessMap };
+}
+
+// [Visual] 移植 v5.6 的几何体置换
+function modifyAsteroidGeometry(geometry, radius) {
+    const posAttribute = geometry.attributes.position;
+    const vertex = new THREE.Vector3(); const count = posAttribute.count;
+    const seed = Math.random() * 100;
+    const amp1 = radius * (0.3 + Math.random() * 0.4); 
+    const lumps = [];
+    const numLumps = 2 + Math.floor(Math.random() * 3);
+    for(let k=0; k<numLumps; k++) { lumps.push({ x: Math.random()-0.5, y: Math.random()-0.5, z: Math.random()-0.5, strength: 0.2 + Math.random() * 0.3, width: 1.5 + Math.random() });
+    }
+    const craters = []; const numCraters = 1 + Math.floor(Math.random() * 2);
+    for(let k=0; k<numCraters; k++) { craters.push({ x: Math.random()-0.5, y: Math.random()-0.5, z: Math.random()-0.5, strength: 0.1 + Math.random() * 0.1, width: 3.0 + Math.random() * 2.0 });
+    }
+    const scaleX = 0.8 + Math.random() * 0.4; const scaleY = 0.8 + Math.random() * 0.4;
+    const scaleZ = 0.8 + Math.random() * 0.4;
+    for (let i = 0; i < count; i++) {
+        vertex.fromBufferAttribute(posAttribute, i);
+        vertex.normalize(); 
+        let r = radius;
+        const noise1 = Math.sin(vertex.x * 2.5 + seed) * Math.cos(vertex.y * 2.5 + seed) * Math.sin(vertex.z * 2.5 + seed);
+        r += noise1 * amp1;
+        for(let l of lumps) { const dot = vertex.x * l.x + vertex.y * l.y + vertex.z * l.z;
+        if(dot > 0) r += Math.pow(dot, l.width) * radius * l.strength;
+        }
+        for(let c of craters) { const dot = vertex.x * c.x + vertex.y * c.y + vertex.z * c.z;
+        if(dot > 0.8) r -= Math.pow(dot, c.width) * radius * c.strength; }
+        vertex.multiplyScalar(r);
+        vertex.x *= scaleX; vertex.y *= scaleY; vertex.z *= scaleZ;
+        posAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+    }
+    geometry.computeVertexNormals();
+}
+
+function clearBackgroundBelt() {
+    if (!bgGroup) return;
+    bgGroup.children.forEach(child => { if (child.geometry) child.geometry.dispose(); if (child.material) child.material.dispose(); });
+    scene.remove(bgGroup);
+    bgGroup = null;
+}
+
+// [Visual] 移植 v5.6 的 InstancedMesh 背景带 + [Logic] Z轴范围修改 [-1500, -6000] + 数量增加 + 碰撞数据记录
+function createBackgroundBelt() {
+    bgGroup = new THREE.Group();
+    // [Change] 增加数量以填充更大空间
+    const totalCount = 4500; 
+    const variants = 5; const countPerVariant = Math.ceil(totalCount / variants);
+    const occupiedSpaces = [];
+    bgAsteroidsData = []; // Reset Global Data
+
+    const bgStyle = Math.floor(Math.random() * 11);
+    const maps = createAsteroidMaps(bgStyle);
+    const bgGray = 0.3 + Math.random() * 0.4; const bgColor = new THREE.Color().setHSL(0, 0, bgGray);
+    let metalness = 0.1; if (bgStyle === 3) metalness = 0.8; if (bgStyle === 4) metalness = 0.4;
+    if (bgStyle === 8) metalness = 0.7; if (bgStyle === 10) metalness = 0.9;
+    const baseMaterial = new THREE.MeshStandardMaterial({ map: maps.baseMap, normalMap: maps.normalMap, normalScale: new THREE.Vector2(2, 2), roughnessMap: maps.roughnessMap, roughness: 1.0, metalness: metalness, color: bgColor, transparent: false, opacity: 1.0 });
+    baseMaterial.onBeforeCompile = (shader) => {
+        shader.uniforms.time = { value: 0 };
+        baseMaterial.userData.shader = shader;
+        shader.vertexShader = 'uniform float time;\n' + shader.vertexShader;
+        shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `vec3 transformed = vec3( position ); float randomOffset = sin(instanceMatrix[3].x * 0.01 + instanceMatrix[3].z * 0.01); float floatY = sin(time * 0.2 + randomOffset * 10.0) * 5.0; float floatX = cos(time * 0.15 + randomOffset * 10.0) * 5.0; transformed.y += floatY; transformed.x += floatX;`);
+    };
+    const dummy = new THREE.Object3D();
+    for (let v = 0; v < variants; v++) {
+        const baseRadius = 10;
+        const geometry = new THREE.IcosahedronGeometry(baseRadius, 2); modifyAsteroidGeometry(geometry, baseRadius);
+        const mesh = new THREE.InstancedMesh(geometry, baseMaterial, countPerVariant);
+        let validCount = 0;
+        for (let i = 0; i < countPerVariant; i++) {
+            let attempts = 0;
+            let placed = false; let x, y, z, s, currentRadius;
+            while (!placed && attempts < 10) {
+                const r = Math.random();
+                // [Logic] 原始随机大小生成
+                if (r > 0.90) s = 20.0 + Math.random() * 30.0;
+                else if (r > 0.70) s = 8.0 + Math.random() * 15.0; 
+                else s = 1.0 + Math.random() * 7.0;
+                const theta = Math.random() * Math.PI * 2; const dist = 4000 + Math.random() * 8000;
+                x = Math.cos(theta) * dist; 
+                
+                // [Logic Change] Z轴范围: -1200 到 -4500 (此处保持原有生成逻辑)
+                z = -1200 - Math.random() * 3300;
+                // --- NEW LOGIC: 防穿模尺寸限制 ---
+                // 如果 Z 轴位于 -1200 到 -1600 之间（靠近前景诗歌区）
+                if (z > -1600) {
+                    // 强制将最大缩放限制在 6.0 以内 (约半径 60)，避免巨大的岩石遮挡文字
+                    s = Math.min(s, 6.0);
+                }
+                
+                y = (Math.random() - 0.5) * 8000;
+                currentRadius = baseRadius * s; // 重新计算半径
+
+                let collision = false;
+                for (let j = 0; j < occupiedSpaces.length; j++) { const other = occupiedSpaces[j]; const dx = x - other.x;
+                const dy = y - other.y; const dz = z - other.z; const distSq = dx*dx + dy*dy + dz*dz;
+                const minDist = (currentRadius + other.radius) * 1.5; if (distSq < minDist * minDist) { collision = true; break;
+                } }
+                if (!collision) placed = true;
+                attempts++;
+            }
+            if (placed) { 
+                dummy.position.set(x, y, z);
+                dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI); dummy.scale.set(s, s, s); dummy.updateMatrix(); mesh.setMatrixAt(validCount, dummy.matrix);
+                occupiedSpaces.push({ x: x, y: y, z: z, radius: currentRadius });
+                // [ADD] Store for collision check with text
+                bgAsteroidsData.push({ x: x, y: y, z: z, r: currentRadius });
+                validCount++; 
+            } 
+            else { dummy.position.set(0, 100000, 0);
+            dummy.scale.set(0, 0, 0); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix); }
+        }
+        bgGroup.add(mesh);
+    }
+    bgGroup.rotation.x = Math.PI / 30; bgGroup.rotation.z = Math.PI / 30; scene.add(bgGroup);
+}
+
+// --- 新增：彗星系统 ---
+function spawnComet() {
+    // 彗星头部
+    const headGeo = new THREE.SphereGeometry(15, 8, 8);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xaaccff, transparent: true, opacity: 0.9 });
+    const mesh = new THREE.Mesh(headGeo, mat);
+    // 彗星尾部 (圆锥体)
+    const tailGeo = new THREE.ConeGeometry(15, 300, 8, 1, true);
+    tailGeo.rotateX(Math.PI / 2);
+    tailGeo.translate(0, 0, 150); 
+    const tailMat = new THREE.MeshBasicMaterial({ color: 0x4466aa, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false });
+    const tail = new THREE.Mesh(tailGeo, tailMat);
+    mesh.add(tail);
+
+    // 随机位置：Z轴 -2000 到 -3000
+    const startZ = -2000 - Math.random() * 1000;
+    const startY = (Math.random() - 0.5) * 3000;
+    // X轴：从屏幕外侧飞入
+    const startX = (Math.random() > 0.5 ? 1 : -1) * 5000;
+    mesh.position.set(startX, startY, startZ);
+    
+    const targetX = (Math.random() - 0.5) * 1000;
+    const targetY = (Math.random() - 0.5) * 500;
+    const dx = targetX - startX;
+    const dy = targetY - startY;
+    const angle = Math.atan2(dy, dx);
+    const speed = 30 + Math.random() * 20; 
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed;
+    const vz = (Math.random() - 0.5) * 5; 
+
+    mesh.rotation.y = -angle; 
+    scene.add(mesh);
+    comets.push({ mesh: mesh, vx: vx, vy: vy, vz: vz });
+}
+
+function updateComets() {
+    for (let i = comets.length - 1; i >= 0; i--) {
+        const c = comets[i];
+        c.mesh.position.x += c.vx;
+        c.mesh.position.y += c.vy;
+        c.mesh.position.z += c.vz;
+        
+        c.mesh.children[0].scale.x = 1 + Math.sin(Date.now() * 0.02) * 0.2;
+        c.mesh.children[0].scale.y = 1 + Math.cos(Date.now() * 0.02) * 0.2;
+
+        if (Math.abs(c.mesh.position.x) > 6000 || Math.abs(c.mesh.position.y) > 4000) {
+            scene.remove(c.mesh);
+            if(c.mesh.geometry) c.mesh.geometry.dispose();
+            if(c.mesh.material) c.mesh.material.dispose();
+            if(c.mesh.children[0]) { c.mesh.children[0].geometry.dispose(); c.mesh.children[0].material.dispose(); }
+            comets.splice(i, 1);
+        }
+    }
+    if (comets.length < 2 && Math.random() < 0.005) { spawnComet();
+    }
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight); labelRenderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ================= 6. 游戏内物体逻辑 (GAMEPLAY) =================
+
+function generateSoftColor() {
+    const h = Math.floor(Math.random() * 360);
+    const s = Math.floor(Math.random() * 30) + 30; const l = Math.floor(Math.random() * 25) + 50; 
+    return `hsl(${h}, ${s}%, ${l}%)`;
+}
+
+function createTextRingTexture(text, color) {
+    const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    ctx.font = "bold 60px 'PingFang SC', sans-serif"; ctx.fillStyle = color; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.shadowColor = color; ctx.shadowBlur = 15; ctx.fillText(text, 512, 64);
+    const texture = new THREE.CanvasTexture(canvas); texture.needsUpdate = true; return texture;
+}
+
+// ========== 椭圆分布生成逻辑 (逻辑保留 + Z轴范围修改 + 四角检测 + 视觉增强) ==========
+function spawnTextAsteroids(groups) {
+    groups.forEach((group, gIndex) => {
+        const linesToSpawn = [...group.lines].sort(() => 0.5 - Math.random());
+        linesToSpawn.forEach((lineObj, lIndex) => {
+            const div = document.createElement('div'); div.className = 'asteroid-card'; div.textContent = lineObj.txt; div.style.fontSize = '24px'; 
+            const objectCSS = new THREE.CSS3DObject(div);
+            
+            // [Visual] 使用 v5.6 的高精度陨石生成参数
+            const radius = 25 + Math.random() * 15; 
+            const geometry = new THREE.IcosahedronGeometry(radius, 4); modifyAsteroidGeometry(geometry, radius);
+            const randomStyle = Math.floor(Math.random() * 11); const maps = createAsteroidMaps(randomStyle);
+            const randomLightness = 0.05 + Math.random() * 0.35; const randomColor = new THREE.Color().setHSL(0, 0, 
+            randomLightness);
+            let metalness = 0.2; if (randomStyle === 3) metalness = 0.8;
+            const material = new THREE.MeshStandardMaterial({ map: maps.baseMap, normalMap: maps.normalMap, normalScale: new THREE.Vector2(1.5, 1.5), roughnessMap: maps.roughnessMap, roughness: 1.0, metalness: metalness, color: randomColor });
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            // [Visual] 使用 v5.6 的大尺寸文字环
+            const ringRadius = radius * 2.2;
+            const ringHeight = 50; const ringGeo = new THREE.CylinderGeometry(ringRadius, ringRadius, ringHeight, 32, 1, true);
+            const ringMat = new THREE.MeshBasicMaterial({ map: createTextRingTexture(lineObj.txt, currentRingColor), transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
+            const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+
+            let attempts = 0; let validPosition = false; let x, y, z;
+            while (!validPosition && attempts < 50) {
+                
+                // [Logic Change] Z轴范围: -300 到 -1000
+                z = -300 - Math.random() * 700;
+                const vFOV = THREE.Math.degToRad(camera.fov); const dist = Math.abs(z - camera.position.z);
+                const visibleHeight = 2 * Math.tan(vFOV / 2) * dist;
+                const visibleWidth = visibleHeight * camera.aspect;
+                
+                // [Logic Change] X轴范围扩大，边距增加到 80 (大幅扩大)
+                const marginX = 80;
+                const marginY = 100; 
+                const a = Math.max(0, (visibleWidth / 2) - marginX);
+                const b = Math.max(0, (visibleHeight / 2) - marginY); 
+                const theta = Math.random() * Math.PI * 2;
+                const r = Math.sqrt(Math.random()); 
+                x = a * r * Math.cos(theta); y = b * r * Math.sin(theta);
+                // [Logic Change] 智能四角检测
+                const xPct = x / (visibleWidth / 2);
+                // -1 到 1
+                const yPct = y / (visibleHeight / 2);
+                // -1 到 1 (注意 y 向上为正)
+                
+                let inCorner = false;
+                // 左上 (计数器): x < -0.6, y > 0.6
+                if (xPct < -0.6 && yPct > 0.6) inCorner = true;
+                // 右上 (进度条): x > 0.6, y > 0.7
+                if (xPct > 0.6 && yPct > 0.7) inCorner = true;
+                // 左下 (备选栏): x < -0.6, y < -0.6
+                if (xPct < -0.6 && yPct < -0.6) inCorner = true;
+                // 右下 (按钮组): x > 0.6, y < -0.5
+                if (xPct > 0.6 && yPct < -0.5) inCorner = true;
+                let tooClose = false;
+                for (let other of activeObjects) { const dx = x - other.css.position.x;
+                const dy = y - other.css.position.y; const dz = z - other.css.position.z; const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                if (d < 320) { tooClose = true; break; } }
+                
+                // [ADD] Check against background asteroids
+                if (!tooClose) {
+                    for (let bg of bgAsteroidsData) {
+          
+                        // Pre-filter by Z depth (optimization)
+                        if (Math.abs(z - bg.z) > 200) continue;
+                        const dx = x - bg.x; const dy = y - bg.y; const dz = z - bg.z;
+                        const dSq = dx*dx + dy*dy + dz*dz;
+                        // Safe distance = text radius + asteroid radius + buffer
+                        const safeDist = radius + bg.r + 100;
+                        if (dSq < safeDist * safeDist) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!tooClose && !inCorner) validPosition = true;
+                attempts++;
+            }
+
+            objectCSS.position.set(x, y, z);
+            mesh.position.set(x - 40, y, z - 20); ringMesh.position.copy(mesh.position); 
+            ringMesh.rotation.x = (Math.random() - 0.5) * 0.5;
+            ringMesh.rotation.z = (Math.random() - 0.5) * 0.5;
+
+            const rotSpeed = { x: (Math.random() - 0.5) * 0.02, y: (Math.random() - 0.5) * 0.02, z: (Math.random() - 0.5) * 0.02 };
+            const floatParams = { originPos: objectCSS.position.clone(), floatSpeed: 0.0002 + Math.random() * 0.0012, floatPhase: Math.random() * Math.PI * 2, floatAmp: 20 + Math.random() * 40, floatAmpX: 20 + Math.random() * 40, floatPhaseX: Math.random() * Math.PI * 2, floatAmpZ: 5 + Math.random() * 15, floatPhaseZ: Math.random() * Math.PI * 2, ringRotSpeed: 0.01 + Math.random() * 0.02 };
+            objectCSS.userData = { text: lineObj.txt, groupId: group.id, lineIndex: lineObj.idx, isHovered: false, linkedMesh: mesh, linkedRing: ringMesh, rotSpeed: rotSpeed, ...floatParams };
+            const animateEnter = () => {
+                if (objectCSS.userData.isHovered) return;
+                // --- 新增代码: 悬停音效改为书页声 ---
+                SoundManager.playPageTurn();
+                // ---------------------------------
+                objectCSS.userData.isHovered = true; div.classList.add('active-reading');
+                new TWEEN.Tween(ringMesh.material).to({ opacity: 0 }, 200).start();
+                new TWEEN.Tween(mesh.scale).to({ x: 1.2, y: 1.2, z: 1.2 }, 300).easing(TWEEN.Easing.Quadratic.Out).start();
+                objectCSS.lookAt(camera.position); new TWEEN.Tween(objectCSS.scale).to({ x: 1.5, y: 1.5, z: 1.5 }, 300).start();
+            };
+            const animateLeave = () => {
+                if (!objectCSS.userData.isHovered) return;
+                objectCSS.userData.isHovered = false; div.classList.remove('active-reading');
+                new TWEEN.Tween(ringMesh.material).to({ opacity: 0.9 }, 300).start();
+                new TWEEN.Tween(mesh.scale).to({ x: 1, y: 1, z: 1 }, 300).easing(TWEEN.Easing.Quadratic.Out).start();
+                new TWEEN.Tween(objectCSS.scale).to({ x: 1, y: 1, z: 1 }, 300).start();
+            };
+            objectCSS.userData.onEnter = animateEnter; objectCSS.userData.onLeave = animateLeave;
+            // [修改 1/2] 增加 DOM 悬停标记，告诉射线检测“别关我”
+            div.addEventListener('mouseenter', () => { 
+                if (objectCSS.element.style.pointerEvents === 'none') return; 
+                objectCSS.userData.isDomHovered = true; // 标记：鼠标在文字上
+                animateEnter(); 
+            });
+            div.addEventListener('mouseleave', () => { 
+                if (objectCSS.element.style.pointerEvents === 'none') return; 
+                objectCSS.userData.isDomHovered = false; // 标记：鼠标离开文字了
+                animateLeave(); 
+            });
+            div.addEventListener('pointerdown', (e) => { 
+                 e.stopPropagation(); 
+                 if (objectCSS.element.style.pointerEvents !== 'none') {
+                    // 新增：播放岩石撞击金属音效
+                    SoundManager.playRockMetal();
+                    addToSlot(lineObj, group.id, objectCSS); 
+                 }
+            });
+
+            scene.add(objectCSS); scene.add(mesh); scene.add(ringMesh);
+            activeObjects.push({ css: objectCSS, mesh: mesh, ringMesh: ringMesh });
+            objectCSS.scale.set(0,0,0); mesh.scale.set(0,0,0); ringMesh.scale.set(0,0,0);
+            const delay = Math.random() * 500;
+            new TWEEN.Tween(objectCSS.scale).to({x: 1, y: 1, z: 1}, 800).easing(TWEEN.Easing.Back.Out).delay(delay).start();
+            new TWEEN.Tween(mesh.scale).to({x: 1, y: 1, z: 1}, 800).easing(TWEEN.Easing.Back.Out).delay(delay).start();
+            new TWEEN.Tween(ringMesh.scale).to({x: 1, y: 1, z: 1}, 800).easing(TWEEN.Easing.Back.Out).delay(delay).start();
+        });
+    });
+}
+
+function addToSlot(lineData, groupId, cssObject) {
+    if (isWarping) return;
+    if (selectionSlot.length >= MAX_SLOTS) { showToast("存储槽已满，请移除", "warning"); return;
+    }
+    
+    // 停止共鸣动画
+    if(cssObject.userData.resonanceTween) {
+        cssObject.userData.resonanceTween.stop();
+        cssObject.userData.resonanceMeshTween.stop(); cssObject.userData.resonanceEmissiveTween.stop();
+        cssObject.userData.linkedMesh.material.emissive.setHex(0x000000);
+    }
+    
+    const mesh = cssObject.userData.linkedMesh; const ring = cssObject.userData.linkedRing;
+    cssObject.element.style.pointerEvents = 'none'; cssObject.userData.isHovered = false; cssObject.element.classList.remove('active-reading');
+    
+    selectionSlot.push({ txt: lineData.txt, idx: lineData.idx, groupId: groupId, originalObj: cssObject });
+
+    // [新增] 检查逻辑：如果当前收集的碎片属于正在提示的组，且该组已全部集齐
+    if (currentHintGroupId && currentHintGroupId === groupId) {
+        const groupData = allGroups.find(g => g.id === groupId);
+        if (groupData) {
+            // 计算备选栏中该组碎片的数量
+            const collectedCount = selectionSlot.filter(item => item.groupId === groupId).length;
+            // 如果数量等于该组原本的总行数
+            if (collectedCount === groupData.lines.length) {
+                // 立即停止呼吸音效和视觉高亮 (SoundManager内部有0.5s淡出，不会突兀)
+                stopResonance(groupId);
+                showToast("共鸣矿石已捕获", "success");
+            }
+        }
+    }
+
+    new TWEEN.Tween(cssObject.scale).to({x: 0, y: 0, z: 0}, 300).start();
+    new TWEEN.Tween(mesh.scale).to({x: 0, y: 0, z: 0}, 300).start();
+    new TWEEN.Tween(ring.scale).to({x: 0, y: 0, z: 0}, 300).onComplete(() => {
+        scene.remove(cssObject); scene.remove(mesh); scene.remove(ring);
+        if (cssObject.element && cssObject.element.parentNode) cssObject.element.parentNode.removeChild(cssObject.element);
+        const idx = activeObjects.findIndex(item => item.css === cssObject);
+        if (idx > -1) activeObjects.splice(idx, 1);
+    }).start();
+    if(hoveredObject && hoveredObject.css === cssObject) hoveredObject = null;
+    renderSlots();
+    checkCombination();
+}
+
+function removeFromSlot(index) {
+    const item = selectionSlot[index];
+    selectionSlot.splice(index, 1);
+    const cssObject = item.originalObj;
+    const mesh = cssObject.userData.linkedMesh; const ring = cssObject.userData.linkedRing; 
+
+    document.getElementById('css3d-container').appendChild(cssObject.element);
+    scene.add(cssObject); scene.add(mesh); scene.add(ring);
+    activeObjects.push({ css: cssObject, mesh: mesh, ringMesh: ring });
+    cssObject.element.style.pointerEvents = 'auto'; ring.material.opacity = 0.9; cssObject.element.classList.remove('active-reading');
+    new TWEEN.Tween(cssObject.scale).to({x: 1, y: 1, z: 1}, 500).easing(TWEEN.Easing.Back.Out).start();
+    new TWEEN.Tween(mesh.scale).to({x: 1, y: 1, z: 1}, 500).easing(TWEEN.Easing.Back.Out).start();
+    new TWEEN.Tween(ring.scale).to({x: 1, y: 1, z: 1}, 500).easing(TWEEN.Easing.Back.Out).start();
+    
+    renderSlots();
+    document.getElementById('confirm-btn').classList.remove('visible');
+}
+
+function renderSlots() {
+    const container = document.getElementById('slot-area');
+    container.innerHTML = '';
+    if (selectionSlot.length === 0) { container.innerHTML = '<div class="slot-placeholder">点击空中的碎片拼接...</div>'; return;
+    }
+    selectionSlot.forEach((item, i) => {
+        const div = document.createElement('div'); div.className = 'slot-card'; div.draggable = true; div.textContent = item.txt; div.dataset.index = i; 
+        div.onclick = () => removeFromSlot(i);
+        div.addEventListener('dragstart', handleDragStart); div.addEventListener('dragover', handleDragOver); div.addEventListener('drop', handleDrop); div.addEventListener('dragend', handleDragEnd); div.addEventListener('dragenter', handleDragEnter); div.addEventListener('dragleave', handleDragLeave);
+        container.appendChild(div);
+    });
+}
+let dragSrcEl = null;
+
+function handleDragStart(e) { 
+    dragSrcEl = this; 
+    e.dataTransfer.effectAllowed = 'move'; 
+    e.dataTransfer.setData('text/html', this.innerHTML); 
+    this.classList.add('dragging');
+}
+
+function handleDragOver(e) { 
+    if (e.preventDefault) e.preventDefault(); 
+    e.dataTransfer.dropEffect = 'move'; 
+    return false; 
+}
+
+function handleDragEnter(e) { 
+    this.classList.add('drag-over'); 
+}
+
+function handleDragLeave(e) { 
+    this.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) e.stopPropagation();
+
+    // 只有当拖拽源和目标不同时才执行
+    if (dragSrcEl !== this) {
+        const srcIndex = parseInt(dragSrcEl.dataset.index);
+        const targetIndex = parseInt(this.dataset.index);
+
+        if (!isNaN(srcIndex) && !isNaN(targetIndex)) {
+            // [核心修改] 使用 splice 实现“移动/插入”而非“交换”
+            // 1. 先把元素从原来的位置拿出来
+            const itemToMove = selectionSlot.splice(srcIndex, 1)[0];
+            
+            // 2. 这里的逻辑微调：如果是从上往下拖(src < target)，
+            // 因为删除了一个元素，后面的索引都减1了，但我们希望插入在视觉目标的位置
+            // 不过在 UI 交互上，直接插入到 targetIndex 通常符合直觉（插入到目标位置之前）
+            selectionSlot.splice(targetIndex, 0, itemToMove);
+            
+            // 3. 立即刷新 UI 和逻辑检测
+            renderSlots(); 
+            checkCombination();
+        }
+    }
+    return false;
+}
+
+function handleDragEnd(e) { 
+    const cols = document.querySelectorAll('.slot-card');
+    cols.forEach(col => { 
+        col.classList.remove('drag-over'); 
+        col.classList.remove('dragging'); 
+    });
+    dragSrcEl = null;
+}
+
+// ================== 核心逻辑 ==================
+function checkCombination() {
+    if (selectionSlot.length === 0) return;
+    // 拼贴模式
+    if (currentMode === 'collage') {
+        if (selectionSlot.length >= 3) {
+            showConfirmButton(null, 'collage');
+        } else {
+            document.getElementById('confirm-btn').classList.remove('visible');
+        }
+        return;
+    }
+
+    // 正常模式
+    const targetGroupId = selectionSlot[0].groupId;
+    const isHomogeneous = selectionSlot.every(s => s.groupId === targetGroupId);
+
+    if (!isHomogeneous) {
+        document.getElementById('confirm-btn').classList.remove('visible');
+        if (selectionSlot.length === MAX_SLOTS) {
+            mismatchCount++;
+            if(mismatchCount >= 2) document.getElementById('hint-btn').classList.add('visible');
+            showToast("矿石不匹配，请重选", "error");
+        }
+        return;
+    }
+
+    const groupData = allGroups.find(g => g.id === targetGroupId);
+    if (selectionSlot.length === groupData.lines.length) {
+        let correct = true;
+        for(let i=0; i<selectionSlot.length; i++) { if(selectionSlot[i].idx !== i) correct = false;
+        }
+
+        if (correct) {
+            showConfirmButton(targetGroupId, 'normal');
+        } else {
+            orderErrorCount++;
+            if (orderErrorCount >= 4) {
+                selectionSlot.sort((a, b) => a.idx - b.idx);
+                renderSlots(); 
+                showConfirmButton(targetGroupId, 'normal'); showToast("智能辅助：已自动排序", "success");
+            } else {
+                showToast("顺序错乱", "error");
+            }
+        }
+    }
+}
+
+function triggerHint() {
+    if (currentMode === 'collage') return;
+    document.getElementById('hint-btn').classList.remove('visible');
+    mismatchCount = 0; 
+    const counts = {}; selectionSlot.forEach(item => { counts[item.groupId] = (counts[item.groupId] || 0) + 1; });
+    let targetGroupId = null;
+    for(let gid in counts) { if(counts[gid] >= 2) { targetGroupId = gid; break;
+    } }
+    if(!targetGroupId && activeGroups.length > 0) { const randomGroup = activeGroups[Math.floor(Math.random() * activeGroups.length)]; targetGroupId = randomGroup.id;
+    }
+
+    if(targetGroupId) {
+        highlightGroup(targetGroupId);
+        showToast("正在共鸣目标诗歌...", "warning");
+    }
+}
+
+// ========== 同步呼吸共鸣效果 ==========
+function highlightGroup(targetGroupId) {
+    currentHintGroupId = targetGroupId; // [新增] 记录当前提示的目标ID
+    // [新增] 启动呼吸音效
+    SoundManager.startResonance();
+
+    activeObjects.forEach(obj => {
+        if(obj.css.userData.groupId === targetGroupId) {
+            const tweenScale = new TWEEN.Tween(obj.css.scale).to({x: 1.3, y: 1.3, z: 1.3}, 1500).easing(TWEEN.Easing.Quadratic.InOut).yoyo(true).repeat(Infinity).start();
+            const tweenMeshScale = new TWEEN.Tween(obj.mesh.scale).to({x: 1.3, y: 1.3, z: 1.3}, 1500).easing(TWEEN.Easing.Quadratic.InOut).yoyo(true).repeat(Infinity).start();
+            const tweenEmissive = new TWEEN.Tween(obj.mesh.material.emissive).to({ r: 0.5, g: 0.4, b: 0 }, 1500).easing(TWEEN.Easing.Quadratic.InOut).yoyo(true).repeat(Infinity).start();
+          
+            obj.css.userData.resonanceTween = tweenScale;
+            obj.css.userData.resonanceMeshTween = tweenMeshScale;
+            obj.css.userData.resonanceEmissiveTween = tweenEmissive;
+        }
+    });
+    const slotContainer = document.getElementById('slot-area');
+    const slots = slotContainer.children; 
+    selectionSlot.forEach((item, index) => {
+        if(item.groupId === targetGroupId && slots[index]) {
+            slots[index].classList.add('hint-active');
+        }
+    });
+    // 修改点：提示持续时间改为10秒
+    setTimeout(() => { stopResonance(targetGroupId); }, 10000);
+}
+
+function stopResonance(targetGroupId) {
+    // [新增] 如果停止的是当前提示组，则重置全局状态
+    if (currentHintGroupId === targetGroupId) {
+        currentHintGroupId = null;
+    }
+
+    // [新增] 停止呼吸音效并销毁振荡器
+    SoundManager.stopResonance();
+
+    activeObjects.forEach(obj => {
+        if(obj.css.userData.groupId === targetGroupId && obj.css.userData.resonanceTween) {
+            obj.css.userData.resonanceTween.stop(); obj.css.userData.resonanceMeshTween.stop(); obj.css.userData.resonanceEmissiveTween.stop();
+            new TWEEN.Tween(obj.css.scale).to({x:1, y:1, z:1}, 500).start();
+            new TWEEN.Tween(obj.mesh.scale).to({x:1, y:1, z:1}, 500).start();
+            new TWEEN.Tween(obj.mesh.material.emissive).to({r:0, g:0, b:0}, 500).start();
+           
+            delete obj.css.userData.resonanceTween;
+        }
+    });
+    const slots = document.querySelectorAll('.slot-card');
+    slots.forEach(s => s.classList.remove('hint-active'));
+}
+
+function showToast(msg, className) {
+    SoundManager.playAlert();
+    const t = document.getElementById('toast'); const tMsg = document.getElementById('toast-message');
+    tMsg.textContent = msg; t.className = ''; t.classList.add(className);
+    void t.offsetWidth; t.classList.add('visible'); setTimeout(() => { t.classList.remove('visible'); }, 2000);
+}
+
+function showConfirmButton(id, type) {
+    const btn = document.getElementById('confirm-btn');
+    btn.classList.add('visible');
+    if (type === 'collage') {
+        btn.textContent = "自由提炼"; btn.style.borderColor = "#ff99cc";
+        btn.style.color = "#ff99cc";
+    } else {
+        btn.textContent = "提炼诗歌晶体"; btn.style.borderColor = "#66ff66";
+        btn.style.color = "#66ff66";
+    }
+    btn.onclick = (e) => {
+        // --- 修改点：确认时播放火焰声 ---
+        SoundManager.playFire();
+        // ------------------------------
+        e.stopPropagation();
+        if (type === 'collage') completeCollage(); else completeGroup(id);
+        btn.classList.remove('visible'); btn.onclick = null;
+    };
+}
+
+function downloadFile(content, filename, mimeType = 'text/plain') {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function getPoemText(item) {
+    if (item.type === 'normal') {
+        const groupData = allGroups.find(g => g.id === item.id);
+        return groupData ? groupData.lines.map(l => l.txt).join('\n') : "Error: Poem not found";
+    } else { return item.lines.join('\n');
+    }
+}
+
+function downloadSinglePoem(index) {
+    const item = collectedItems[index];
+    const poemText = getPoemText(item);
+    
+    // [修改] 增加署名校验逻辑
+    // 检查条件：拼贴模式(collage) 且 当前内存中无名字(!userSignature)
+    if (item.type === 'collage' && !userSignature) {
+        // 弹出输入框
+        const inputName = prompt("【拼贴诗署名】\n请输入您的名字，它将作为共笔作者印制在诗歌晶体上：\n(本次运行期间有效，重启后重置)", "匿名飞行员");
+        
+        if (inputName && inputName.trim() !== "") {
+            userSignature = inputName.trim(); // 更新内存变量
+            
+            // 名字录入成功后，继续执行保存
+            generateAndSaveCardImage(poemText, item.type, item.id || '0');
+        }
+        // 如果用户点击取消，则不执行下载
+    } else {
+        // 正常模式 或 内存中已有名字，直接保存
+        generateAndSaveCardImage(poemText, item.type, item.id || '0');
+    }
+}
+
+function downloadAllPoems() {
+    if (collectedItems.length === 0) { showToast("暂无数据可供下载", "warning"); return;
+    }
+    const allData = collectedItems.map((item, index) => {
+        return `--- ${item.type === 'collage' ? '拼贴诗' : '诗歌'} #${index + 1} ---\n${getPoemText(item)}\n\n`;
+    }).join('');
+    downloadFile(allData, '幻想机_全部已收集诗歌.txt', 'text/plain');
+    showToast("已开始下载全部收集数据", "success");
+}
+
+// 新增函数：下载指定模式的所有数据
+function downloadSpecificMode(mode) {
+    let sourceData = [];
+    if (mode === 'normal') {
+        sourceData = GameData.normal.collected;
+    } else {
+        sourceData = GameData.collage.collected;
+    }
+
+    if (!sourceData || sourceData.length === 0) {
+        showToast("该模式下暂无收集", "warning");
+        return;
+    }
+
+    const allData = sourceData.map((item, index) => {
+        return `--- ${item.type === 'collage' ? '拼贴诗' : '诗歌'} #${index + 1} ---\n${getPoemText(item)}\n\n`;
+    }).join('');
+    
+    const filename = `幻想机_${mode === 'normal' ? '正常模式' : '拼贴模式'}_全集.txt`;
+    downloadFile(allData, filename, 'text/plain');
+    showToast("下载已开始", "success");
+}
+// [修改] 离线生成诗歌晶体图片的功能 (正方形、无边框、动态署名)
+function generateAndSaveCardImage(text, type, id) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const width = 800;
+    const height = 800; 
+    canvas.width = width;
+    canvas.height = height;
+
+    // 1. 确定背景颜色
+    let hue = 0;
+    let bgGradient;
+    
+    if (type === 'normal') {
+        const seed = parseInt(id.replace('g', '')) || 0;
+        hue = (seed * 137.5) % 360; 
+        bgGradient = ctx.createLinearGradient(0, 0, width, height);
+        bgGradient.addColorStop(0, `hsl(${hue}, 40%, 15%)`);
+        bgGradient.addColorStop(1, `hsl(${hue + 40}, 50%, 5%)`);
+    } else {
+        bgGradient = ctx.createLinearGradient(0, 0, width, height);
+        bgGradient.addColorStop(0, '#2a0a1a');
+        bgGradient.addColorStop(1, '#1a050a');
+    }
+
+    // 2. 填充背景
+    ctx.fillStyle = bgGradient;
+    ctx.fillRect(0, 0, width, height);
+
+    // 3. 绘制装饰性光晕 (中心)
+    const glow = ctx.createRadialGradient(width/2, height/2, 50, width/2, height/2, 600);
+    glow.addColorStop(0, 'rgba(255,255,255,0.1)');
+    glow.addColorStop(1, 'transparent');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, width, height);
+
+    // 4. 绘制文字
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    ctx.font = "45px 'Songti SC', 'SimSun', serif";
+    const lineHeight = 90;
+    const lines = text.split('\n');
+    
+    const totalTextHeight = lines.length * lineHeight;
+    let startY = (height - totalTextHeight) / 2;
+
+    ctx.shadowColor = "rgba(255,255,255,0.8)";
+    ctx.shadowBlur = 15;
+    lines.forEach((line, i) => {
+        ctx.fillText(line, width / 2, startY + i * lineHeight);
+    });
+
+    // 5. [核心修改] 绘制底部 Logo (动态署名逻辑)
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    
+    let footerText = "—— 曹僧 · 幻 想 机 ——"; // 默认文本
+    
+    // 如果是拼贴模式，且用户已输入过名字，则显示联名款 Logo
+    if (type === 'collage' && userSignature) {
+        footerText = `—— ${userSignature} × 曹僧 · 幻想机 ——`;
+        ctx.font = "20px 'Courier New', monospace"; // 稍微缩小字体以防名字太长
+    } else {
+        ctx.font = "24px 'Courier New', monospace";
+    }
+    
+    ctx.fillText(footerText, width / 2, height - 60);
+
+    // 6. 导出并下载
+    const dataURL = canvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    // 处理文件名，防止特殊字符报错
+    const firstLine = lines[0].trim().replace(/[\\/:*?"<>|]/g, "_").substring(0, 15);
+    link.download = `幻想机_${firstLine}.png`;
+    link.href = dataURL;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast("图片晶体已保存", "success");
+}
+function showCrystalCard(index) {
+    const overlay = document.getElementById('crystal-overlay');
+    const cardContent = document.getElementById('crystal-card-content');
+    
+    // 1. 获取数据
+    const item = collectedItems[index];
+    const text = getPoemText(item);
+    
+    // 2. 构建 HTML 内容
+    cardContent.innerHTML = `
+        <div class="crystal-text" id="crystal-text-content">${text.replace(/\n/g, '<br>')}</div>
+        <div class="crystal-hint">点击空白处将晶体入库</div>
+        <button class="save-img-btn" id="save-card-btn">分享这颗诗歌晶体</button>
+    `;
+
+    // 3. 样式逻辑 (保持不变)
+    let seed = 0;
+    if (item.type === 'normal') {
+        seed = parseInt(item.id.replace('g', '')) || 0;
+        const hue = (seed * 137.5) % 360; 
+        cardContent.style.background = `linear-gradient(135deg, hsl(${hue}, 40%, 15%), hsl(${hue + 40}, 50%, 5%))`;
+        cardContent.style.borderColor = `hsl(${hue}, 60%, 60%)`;
+        cardContent.style.boxShadow = `0 10px 40px hsl(${hue}, 50%, 10%), inset 0 0 60px rgba(0,0,0,0.5)`;
+    } else {
+        cardContent.style.background = `linear-gradient(135deg, #2a0a1a, #1a050a)`;
+        cardContent.style.borderColor = `#ff3366`;
+        cardContent.style.boxShadow = `0 10px 40px rgba(255, 51, 102, 0.3), inset 0 0 60px rgba(255, 0, 50, 0.2)`;
+    }
+
+    // 4. [修改] 绑定按钮点击事件 (仅更新内存变量)
+    const saveBtn = document.getElementById('save-card-btn');
+    saveBtn.onclick = (e) => {
+        e.stopPropagation(); // 防止关闭卡片
+        SoundManager.playHover(); // 播放音效
+
+        // 检查是否需要输入名字：拼贴模式 且 当前无署名
+        if (item.type === 'collage' && !userSignature) {
+            // 使用浏览器原生 prompt 获取名字
+            const inputName = prompt("【拼贴诗署名】\n请输入您的名字，它将作为共笔作者印制在诗歌晶体上：", "匿名飞行员");
+            
+            if (inputName && inputName.trim() !== "") {
+                userSignature = inputName.trim();
+                
+                // [修改重点] 这里不再写入 localStorage
+                // 这样当用户刷新页面或点击“重启系统”时，名字就会被遗忘
+                
+                // 保存图片
+                generateAndSaveCardImage(text, item.type, item.id || '0');
+            } else {
+                // 用户取消输入，不做操作（或根据需求改为默认保存）
+            }
+        } else {
+            // 正常模式 或 内存中已有署名，直接保存
+            generateAndSaveCardImage(text, item.type, item.id || '0');
+        }
+    };
+
+    const modal = document.getElementById('collection-modal');
+    if (modal.classList.contains('visible')) modal.classList.remove('visible');
+    overlay.classList.add('visible');
+}
+
+function closeCrystalCard() {
+    // [新增] 点击关闭/收集晶体卡片时，播放晶体碰撞音效
+    SoundManager.playCrystal();
+
+    const overlay = document.getElementById('crystal-overlay');
+    if (!overlay.classList.contains('visible')) return;
+    overlay.classList.remove('visible');
+    if (currentMode === 'normal') {
+        setTimeout(() => {
+            const activeIds = activeGroups.map(g => g.id);
+            const allActiveDone = activeIds.every(id => finishedGroupIds.includes(id));
+            if (allActiveDone && finishedGroupIds.length < allGroups.length && activeGroups.length > 0) {
+                 GameController.showNextRoundScreen();
+            }
+ 
+        }, 500);
+    } else { selectionSlot = []; renderSlots();
+    }
+}
+
+function completeGroup(groupId) {
+    finishedGroupIds.push(groupId);
+    collectedItems.push({ type: 'normal', id: groupId, lines: null });
+    mismatchCount = 0;
+    orderErrorCount = 0; 
+    document.getElementById('hint-btn').classList.remove('visible');
+    document.getElementById('ore-num').textContent = collectedItems.length;
+    selectionSlot = []; renderSlots(); updateProgressBar();
+    showCrystalCard(collectedItems.length - 1);
+}
+
+function completeCollage() {
+    const lines = selectionSlot.map(s => s.txt);
+    collectedItems.push({ type: 'collage', id: null, lines: lines });
+    document.getElementById('ore-num').textContent = collectedItems.length;
+    selectionSlot = []; renderSlots();
+    showCrystalCard(collectedItems.length - 1);
+}
+
+function toggleCollection() {
+    const modal = document.getElementById('collection-modal');
+    if (modal.classList.contains('visible')) modal.classList.remove('visible');
+    else { renderCollectionList(); modal.classList.add('visible'); }
+}
+
+function renderCollectionList() {
+    const list = document.getElementById('collection-list'); list.innerHTML = '';
+    if (collectedItems.length === 0) { list.innerHTML = '<div style="color:#666; text-align:center; padding:20px;">暂无收集的诗歌晶体</div>'; return;
+    }
+    collectedItems.forEach((item, index) => {
+        let previewText = "";
+        let isCollage = item.type === 'collage';
+        if (isCollage) { previewText = item.lines[0] + '...'; } else { const groupData = allGroups.find(g => g.id === item.id); previewText = groupData.lines[0].txt + '...'; }
+        const div = document.createElement('div');
+        div.className = `collection-item ${isCollage ? 'collage-item' : ''}`;
+        div.innerHTML = `<span><span 
+        class="collection-idx">#${index + 1}</span>${previewText}</span><button class="download-btn-small" onclick="downloadSinglePoem(${index}); event.stopPropagation();">下载</button>`;
+        // --- 修改点：点击列表项播放晶体声 ---
+        div.onclick = (e) => { 
+            SoundManager.playCrystal();
+            e.stopPropagation(); 
+            showCrystalCard(index); 
+        };
+        // ---------------------------------
+        list.appendChild(div);
+    });
+}
+
+function updateProgressBar() {
+    const pct = (finishedGroupIds.length / allGroups.length) * 100;
+    document.getElementById('progress-fill').style.width = pct + '%';
+}
+
+function performWarpJump(onCompleteCallback) {
+    if(isWarping) return;
+    isWarping = true;
+    SoundManager.playWarp(4.5);
+    const overlay = document.getElementById('warp-overlay');
+    
+    overlay.classList.remove('stream-active');
+    void overlay.offsetWidth; 
+    overlay.classList.add('stream-active');
+
+    new TWEEN.Tween(camera.position).to({z: -3000}, 800).easing(TWEEN.Easing.Exponential.In).start();
+
+    setTimeout(() => {
+        if(onCompleteCallback) onCompleteCallback();
+        setTimeout(() => {
+            overlay.classList.remove('stream-active');
+            isWarping = false;
+            new TWEEN.Tween(camera.position).to({z: 0}, 800).easing(TWEEN.Easing.Exponential.Out).start();
+        }, 1200);
+    }, 600);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    TWEEN.update();
+
+    // ==========================================
+    // 1. [增强] 驾驶舱惯性与尘埃动画
+    // ==========================================
+    if (!isWarping) {
+        // --- A. 驾驶舱惯性 (Damped Look-Around) ---
+        // 目标旋转角度：鼠标位置 * 灵敏度系数
+        // 0.00015 控制最大转动角度，0.03 控制阻尼(数值越小越有"重力感")
+        const targetRotX = -mouseY * 0.00018; 
+        const targetRotY = -mouseX * 0.00018;
+        
+        camera.rotation.x += (targetRotX - camera.rotation.x) * 0.01;
+        camera.rotation.y += (targetRotY - camera.rotation.y) * 0.01;
+        
+        // 模拟引擎怠速的微小震动
+        const time = Date.now() * 0.0005;
+        camera.position.x += (Math.cos(time * 0.3) * 3.5 - camera.position.x) * 0.02;
+        camera.position.y += (Math.sin(time * 0.2) * 3.5 - camera.position.y) * 0.02;
+
+        // --- B. 空间尘埃微动 (Space Dust) ---
+        if (dustParticles) {
+            // 尘埃整体缓慢旋流，增加空间流动感
+            dustParticles.rotation.y += 0.0003; 
+            // 尘埃呼吸效果
+            const s = 1 + Math.sin(time * 2) * 0.02;
+            dustParticles.scale.set(s, s, s);
+        }
+
+        // --- C. 星空背景 (保持原有逻辑) ---
+        if (starField) {
+            starField.rotation.z += 0.0005; 
+        }
+        if (bgGroup && bgGroup.children.length > 0) {
+            bgGroup.children.forEach(child => {
+                if (child.material.userData && child.material.userData.shader) 
+                    child.material.userData.shader.uniforms.time.value += 0.01;
+            });
+        }
+    }
+
+    // ==========================================
+    // 2. 射线检测 (Raycaster) - 增强版修复
+    // ==========================================
+    if (!isWarping) {
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(activeObjects.map(o => o.mesh));
+        
+        let currentRayHit = null;
+
+        if (intersects.length > 0) {
+            const hitMesh = intersects[0].object;
+            currentRayHit = activeObjects.find(o => o.mesh === hitMesh);
+        }
+
+        // --- 逻辑 A: 发现新的悬停目标（Raycaster 优先发现，DOM 保持展开） ---
+        if (currentRayHit && currentRayHit !== hoveredObject) {
+            // 如果旧目标存在，且鼠标当前不在其 DOM 区域内，则让它离开
+            if (hoveredObject && !hoveredObject.css.userData.isDomHovered) {
+                hoveredObject.css.userData.onLeave();
+            }
+
+            hoveredObject = currentRayHit;
+            
+            // 首次命中时，如果不是被禁用的物体，则触发 onEnter
+            // 避免重复触发 onEnter，如果鼠标已在 DOM 上方（即 isDomHovered 为 true），则无需 Raycaster 再触发
+            if (hoveredObject.css.element.style.pointerEvents !== 'none' && !hoveredObject.css.userData.isDomHovered) {
+                hoveredObject.css.userData.onEnter();
+            }
+        } 
+        
+        // --- 逻辑 B: 离开了 Raycaster 目标（严格由 DOM 状态控制关闭） ---
+        if (hoveredObject && currentRayHit !== hoveredObject) {
+            // 修复点：只有当 Raycaster 离开了目标，并且鼠标也不在 DOM 区域内时，才触发 onLeave
+            if (!hoveredObject.css.userData.isDomHovered) {
+                hoveredObject.css.userData.onLeave();
+                hoveredObject = null;
+            }
+        }
+    }
+
+    // ==========================================
+    // 3. [增强] 诗歌晶体复合悬浮 (Organic Floating)
+    // ==========================================
+    const now = Date.now();
+    activeObjects.forEach(obj => {
+        const css = obj.css;
+        const mesh = obj.mesh;
+        const ring = obj.ringMesh;
+        const ud = css.userData;
+
+        if (!ud.isHovered) {
+            // [算法优化] 使用复合正弦波模拟流体中的无序漂浮
+            // 避免单一频率导致的机械感
+            const t = now * ud.floatSpeed;
+            
+            // Y轴：叠加两个不同频率的波
+            const floatY = Math.sin(t + ud.floatPhase) * ud.floatAmp 
+                         + Math.sin(t * 1.8 + ud.floatPhase) * (ud.floatAmp * 0.3);
+            
+            // X/Z轴：缓慢的横向漂移 + 周期性摆动
+            const floatX = Math.cos(t * 0.7 + ud.floatPhaseX) * (ud.floatAmpX * 0.8)
+                         + Math.sin(t * 0.3) * 10;
+            const floatZ = Math.sin(t * 0.5 + ud.floatPhaseZ) * (ud.floatAmpZ * 0.8)
+                         + Math.cos(t * 0.4) * 10;
+
+            const newX = ud.originPos.x + floatX;
+            const newY = ud.originPos.y + floatY;
+            const newZ = ud.originPos.z + floatZ;
+
+            css.position.set(newX, newY, newZ);
+            mesh.position.set(newX - 40, newY, newZ - 20);
+            ring.position.copy(mesh.position);
+
+            // 旋转：三轴随机缓慢翻滚
+            mesh.rotation.x += ud.rotSpeed.x;
+            mesh.rotation.y += ud.rotSpeed.y;
+            mesh.rotation.z += ud.rotSpeed.z;
+            
+            // 文字环反向旋转，带微小速度波动
+            ring.rotation.y -= ud.ringRotSpeed * (1 + Math.sin(now * 0.0005) * 0.1);
+        } else {
+            css.lookAt(camera.position);
+        }
+    });
+
+    AtmosphereManager.update(); 
+    renderer.render(scene, camera);
+    labelRenderer.render(scene, camera);
+}
+</script>
+</body>
+</html>

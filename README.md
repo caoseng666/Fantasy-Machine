@@ -1,4 +1,4 @@
-Fantasy Machine: An Interactive Sci-Fi Poetry Anthology
+**Fantasia Machine: An Interactive Game-style Sci-Fi Poetry Collection (by Cao Seng)**
 
 👨‍🚀 Game Overview: You are a Space Knight piloting the fantasy machine Cao Seng, roaming through the ruins of the stars. By collecting lost "Poetry Ores" to refine "Poetry Crystals," you must summon the light of imagination back to your resource-depleted home planet... 
 
@@ -8,7 +8,7 @@ This is a highly entertaining interactive game, but even more so, it is a poetry
 
 —————————————————
 
-幻想机：交互游戏式诗集
+**幻想机：交互游戏式科幻诗集（曹僧作品）**
 
 👨‍🚀游戏介绍： 你是一名太空骑士，驾驶着曹僧号幻想机，在星际废墟中游荡。通过收集失落的诗歌矿石来提炼诗歌晶体，从而为资源日渐枯竭的母星召回想象之光……
 

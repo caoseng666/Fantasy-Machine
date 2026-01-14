@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>幻想机：交互游戏式科幻诗集 | 曹僧作品</title>
+    <title>幻想机 - 曹僧 (深空透视 v6.8)</title>
     <style>
         /* --- 基础样式 --- */
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #020204; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; user-select: none; -webkit-user-select: none; }
@@ -170,9 +170,19 @@
 
         /* 底部星光文字 */
         .footer-starlight {
-            position: absolute; bottom: 40px; font-size: 0.9rem; color: rgba(255, 255, 255, 0.6);
-            letter-spacing: 8px; font-weight: 300; animation: starlight-breathe 4s ease-in-out infinite;
-            z-index: 20; text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+            position: absolute; 
+            bottom: 40px; 
+            left: 0;                  /* 新增：靠左对齐 */
+            width: 100%;             /* 新增：宽度占满全屏 */
+            text-align: center;      /* 新增：文字居中 */
+            text-indent: 8px;        /* 新增：抵消 letter-spacing 产生的右侧空隙，确保绝对视觉居中 */
+            font-size: 0.9rem; 
+            color: rgba(255, 255, 255, 0.6);
+            letter-spacing: 8px; 
+            font-weight: 300; 
+            animation: starlight-breathe 4s ease-in-out infinite;
+            z-index: 20; 
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
         }
         @keyframes starlight-breathe {
             0%, 100% { opacity: 0.4; transform: scale(0.98); }

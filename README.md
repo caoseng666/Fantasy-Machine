@@ -8,7 +8,7 @@ In Normal Mode, refine a Poetry Crystal by correctly selecting and ordering the 
 
 🛸 **Recommendations**: For the best experience, use a desktop browser in Full Screen (Fn+F11), wear headphones, and play in a dimly lit environment.
 
-🚀**First published**: November 29, 2025
+🚀**First Published**: November 29, 2025
 
 ☄️**Language**: Chinese
 
